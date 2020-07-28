@@ -5,6 +5,7 @@
 from telebot import *
 import os
 import traceback
+import mytoken
 
 waiting_notification = False
 pass_to_add = False
@@ -12,11 +13,8 @@ pass_to_keyword = False
 cur_id = 0
 login = 'Family'
 
-bot = TeleBot('992012864:AAGWBqVjYfSIUAlhljxWmk2c9ZpRfeZk-Ew', threaded=False)
+bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
-
-
-
 
 
 def coma_to_dot(txt: str):
@@ -86,7 +84,7 @@ def append_file(filename: str, category: str, keyword: str):
     """
     dummyfile = filename + '.bak'
     with open(filename, encoding='UTF-8') as orig_file, open(dummyfile, 'w',
-                                                                    encoding='UTF-8') as temp_file:
+                                                             encoding='UTF-8') as temp_file:
         for line in orig_file:
             if line.split(';')[0] == category:
                 temp_file.write(line[:-1] + ',' + keyword + '\n')
@@ -103,7 +101,7 @@ def delete_line(original_file, line_number):
     dummy_file = original_file + '.bak'
     # Open original file in read only mode and dummy file in write mode
     with open(original_file, encoding='UTF-8') as read_obj, open(dummy_file, 'w',
-                                                                        encoding='UTF-8') as write_obj:
+                                                                 encoding='UTF-8') as write_obj:
         # Line by line copy data from original file to dummy file
         for line in read_obj:
             # If current line number matches the given line number then skip copying
@@ -213,7 +211,7 @@ def show_list(msg):
 
         message = 'Список покупок:\n'
         for i in list:
-            message += '\n'+i + ':\n'
+            message += '\n' + i + ':\n'
             for x in list[i]:
                 message += f'{list[i].index(x) + 1}) {x}'
         ans = types.InlineKeyboardMarkup(row_width=2)
@@ -240,8 +238,8 @@ def show_products_in_category(msg):
     """
     if UA(msg.message.chat.id):
         global list
-        print(((len(list[msg.data.split(',')[1]])-1)//10)+1)
-        keyboard = types.InlineKeyboardMarkup(row_width=((len(list[msg.data.split(',')[1]])-1)//10)+1)
+        print(((len(list[msg.data.split(',')[1]]) - 1) // 10) + 1)
+        keyboard = types.InlineKeyboardMarkup(row_width=((len(list[msg.data.split(',')[1]]) - 1) // 10) + 1)
         for i in list[msg.data.split(',')[1]]:
             if i[1].isupper():
                 keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p,{i}'))
@@ -388,9 +386,11 @@ def add_person(msg):
 def clear_list(msg):
     if UA(msg.chat.id):
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton('✅ Да, удалить!', callback_data=str(msg.chat.id)+'&clear&yes'))
-        keyboard.add(types.InlineKeyboardButton('❌ Нет, не удалять', callback_data=str(msg.chat.id)+'&clear&no'))
-        bot.send_message(msg.chat.id, 'Вы уверены, что хотите полностью очистить список?\n❗️ЭТО ДЕЙСТВИЕ БУДЕТ НЕВОЗМОЖНО ОТМЕНИТЬ❗️', reply_markup=keyboard)
+        keyboard.add(types.InlineKeyboardButton('✅ Да, удалить!', callback_data=str(msg.chat.id) + '&clear&yes'))
+        keyboard.add(types.InlineKeyboardButton('❌ Нет, не удалять', callback_data=str(msg.chat.id) + '&clear&no'))
+        bot.send_message(msg.chat.id,
+                         'Вы уверены, что хотите полностью очистить список?\n❗️ЭТО ДЕЙСТВИЕ БУДЕТ НЕВОЗМОЖНО ОТМЕНИТЬ❗️',
+                         reply_markup=keyboard)
     else:
         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
 
@@ -402,7 +402,8 @@ def clear_confirmed(msg):
         if msg.data[2] == 'yes':
             with open(login + '.csv', 'w', encoding='UTF-8') as file:
                 file.write('Category;Product\n')
-            bot.edit_message_text('Список успешно очищен', chat_id=msg.message.chat.id, message_id=msg.message.message_id)
+            bot.edit_message_text('Список успешно очищен', chat_id=msg.message.chat.id,
+                                  message_id=msg.message.message_id)
         else:
             bot.edit_message_text('Очистка отменена', chat_id=msg.message.chat.id, message_id=msg.message.message_id)
     else:
