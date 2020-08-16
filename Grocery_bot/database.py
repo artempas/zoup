@@ -1,5 +1,4 @@
 
-
 import sqlite3
 import sys
 import codecs
@@ -50,12 +49,22 @@ def remove_record(table_name: str, column_name: str, value: str):
     :param value:
     :return:
     """
-    try:
-        cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = {value}')
-    except Exception as e:
-        print(str(e))
-        return f'CRITICAL ERROR\n{str(e)}'
-    con.commit()
+    if column_name == '*' and value == '*':
+        try:
+            cur.execute(f'DELETE FROM {table_name}')
+        except Exception as e:
+            print(str(e))
+            return False
+        con.commit()
+        return True
+    else:
+        try:
+            cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = {value}')
+        except Exception as e:
+            print(str(e))
+            return False
+        con.commit()
+        return True
 
 
 def read_table(table_name: str, column_name=None, value=None):
@@ -82,4 +91,4 @@ def read_table(table_name: str, column_name=None, value=None):
 
 
 if __name__ == '__main__':
-    print(read_table('category_product','category', 'Мясо'))
+    print(read_table('Users_database'))

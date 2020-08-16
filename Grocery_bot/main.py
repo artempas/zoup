@@ -16,6 +16,23 @@ db.create_table('Users_database', {'User_id': 'INTEGER', 'Username': 'TEXT', 'Fa
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
 
 
+def form_list_dict(msg):
+    """
+    Формирует словарь {категория:продукт} относящийся к семье отправителя
+    :param msg:
+    :return:
+    """
+    family = db.read_table('Users_database', column='id', value=msg.chat.id)[2]
+    cat_prod = db.read_table(family)
+    cat_prod_dict = {}
+    for line in cat_prod:
+        if line[0] in cat_prod_dict.keys():
+            cat_prod_dict[line[0]].append(line[1])
+        else:
+            cat_prod_dict[line[0]] = []
+    return cat_prod_dict
+
+
 def coma_to_dot(txt: str):
     """
     преобразование всех запятых в тексте в точки
@@ -31,7 +48,6 @@ def coma_to_dot(txt: str):
     return res
 
 
-# TODO notify
 def notify(do, product, family):
     """
     уведомление всех участников семьи о покупке или добавлении в список
@@ -41,18 +57,15 @@ def notify(do, product, family):
     """
     print('GOT TO NOTIFY')
     users_list = db.read_table('Users_database')
-    for x in users_list:
-        for i in x.split(','):
-            print(i)
-            if not i[0].isdigit():
-                continue
+    for user in users_list:
+        if user[2] == family:
+            print(user[1])
             try:
-                bot.send_message(int(i),
+                bot.send_message(user[0],
                                  f'{product.capitalize()} {"куплен(a)" * int(do == "del") + "необходимо купить❗️" * int(do == "add")}')
             except Exception as e:
                 traceback.print_exc()
                 bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
-                time.sleep(15)
 
 
 def check(text: str):
@@ -125,25 +138,6 @@ def delete_line(original_file, line_number):
         os.remove(dummy_file)
 
 
-# TODO переделать
-def UA(user):
-    """
-    проверка на авторизацию
-    :param user:
-    :return:bool
-    """
-    print(user)
-    access_file = open('Family;participants.csv', encoding='UTF-8')
-    for i in access_file:
-        print(i.split(','))
-        if str(user) in i.split(','):
-            access_file.close()
-            return True
-    bot.send_message(354640082, f'{user}/Пытался получить доступ')
-    access_file.close()
-    return False
-
-
 @bot.message_handler(commands=['help'])
 def helper(msg):
     """
@@ -198,13 +192,12 @@ def final_register(msg):
                      db.add_record('Users_database', (msg.chat.id, msg.chat.username, transfering_logins[msg.chat.id])))
     bot.send_message(msg.chat.id,
                      f'Семья успешно создана\nЛогин - {transfering_logins[msg.chat.id]}\nПароль - {password}')
-    del(transfering_logins[msg.chat.id])
+    del (transfering_logins[msg.chat.id])
 
 
 '''ДОЮСДА ГОТОВО'''
 
 
-# TODO переделать, добавить help
 @bot.message_handler(commands=['start'])
 def start_message(message):
     """
@@ -213,134 +206,81 @@ def start_message(message):
     print(message.chat.username)
     helper(message)
 
-#TODO отключено
 
-# @bot.message_handler(commands=['list'])
-# def show_list(msg):
-#     """
-#     отображение списка продуктов
-#     :param msg:
-#     """
-#     global list
-#     global file
-#     if UA(msg.chat.id):
-#         with open(login + '.csv', encoding='UTF-8') as file:
-#             list = {}
-#             cnt = 0
-#             for i in file:
-#                 print(i)
-#                 if i == 'Category,Product\n':
-#                     continue
-#                 else:
-#                     if i.split(',')[0] in list:
-#                         list[i.split(',')[0]].append(i.split(',')[1])
-#                         cnt += 1
-#                     else:
-#                         list[i.split(',')[0]] = [i.split(',')[1]]
-#                         cnt += 1
-#                     print(list, cnt)
-#
-#         message = 'Список покупок:\n'
-#         for i in list:
-#             message += '\n' + i + ':\n'
-#             for x in list[i]:
-#                 message += f'{list[i].index(x) + 1}) {x}'
-#         ans = types.InlineKeyboardMarkup(row_width=2)
-#         if cnt >= 10:
-#             for i in list:
-#                 ans.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
-#         else:
-#             for i in list:
-#                 for x in list[i]:
-#                     if x[1].isupper():
-#                         ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
-#                     else:
-#                         ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
-#         bot.send_message(msg.chat.id, message, reply_markup=ans)
-#     else:
-#         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
-#
-#
-# @bot.callback_query_handler(func=lambda msg: 'c' in msg.data.split(','))
-# def show_products_in_category(msg):
-#     """
-#     отображение продуктов в категории если продуктов больше 10-ти
-#     :param msg:
-#     """
-#     if UA(msg.message.chat.id):
-#         global list
-#         print(((len(list[msg.data.split(',')[1]]) - 1) // 10) + 1)
-#         keyboard = types.InlineKeyboardMarkup(row_width=((len(list[msg.data.split(',')[1]]) - 1) // 10) + 1)
-#         for i in list[msg.data.split(',')[1]]:
-#             if i[1].isupper():
-#                 keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p,{i}'))
-#             else:
-#                 keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p,{i}'))
-#         bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id,
-#                                       reply_markup=keyboard)
-#     else:
-#         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
-#
-#
-# @bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split(','))
-# def remove_product(msg):
-#     """
-#     удаление продукта
-#     :param msg:
-#     """
-#     print('!!!!', msg.message.chat.id)
-#     found = False
-#     if UA(msg.message.chat.id):
-#         with open(login + '.csv', encoding='UTF-8') as f:
-#             cnt = -1
-#             for line in f:
-#                 cnt += 1
-#                 if msg.data.split(',')[1] in line:
-#                     found = True
-#                     break
-#                 else:
-#                     continue
-#             if not found:
-#                 bot.send_message(msg.message.chat.id, 'Возникла ошибка попробуйте отправить /list заново')
-#                 return
-#         delete_line(login + '.csv', cnt)
-#         bot.send_message(msg.message.chat.id, f'{msg.data.split(",")[1]} успешно вычеркнут(а) из списка')
-#         with open(login + '.csv', encoding='UTF-8') as file:
-#             list = {}
-#             cnt = 0
-#             for i in file:
-#                 print(i)
-#                 if i == 'Category,Product\n':
-#                     continue
-#                 else:
-#                     if i.split(',')[0] in list:
-#                         list[i.split(',')[0]].append(i.split(',')[1])
-#                         cnt += 1
-#                     else:
-#                         list[i.split(',')[0]] = [i.split(',')[1]]
-#                         cnt += 1
-#         keyboard = types.InlineKeyboardMarkup(row_width=2)
-#         if cnt >= 10:
-#             for i in list:
-#                 keyboard.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
-#         else:
-#             for i in list:
-#                 for x in list[i]:
-#                     if x[1].isupper():
-#                         keyboard.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
-#                     else:
-#                         keyboard.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
-#         message = 'Список покупок:\n'
-#         for i in list:
-#             message += '\n' + i + ':\n'
-#             for x in list[i]:
-#                 message += f'{list[i].index(x) + 1}) {x}'
-#         bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=message,
-#                               reply_markup=keyboard)
-#         if msg.data.split(',')[1].isupper():
-#             notify('del', msg.data.split(',')[1])
-#     else:
-#         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
+@bot.message_handler(commands=['list'])
+def show_list(msg):
+    """
+    отображение списка продуктов
+    :param msg:
+    """
+    if len(db.read_table('Users_database', column='id', value=msg.chat.id)) != 0:
+        cat_prod_dict = form_list_dict(msg)
+        message = 'Список покупок:\n'
+        for category in cat_prod_dict:
+            message += '\n' + category + ':\n'
+            for product in cat_prod_dict[category]:
+                message += f'{cat_prod_dict[category].index(product) + 1}) {product}'
+        ans = types.InlineKeyboardMarkup(row_width=2)
+        if len(cat_prod_dict.values()) >= 10:
+            for i in cat_prod_dict:
+                ans.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
+        else:
+            for i in cat_prod_dict:
+                for x in cat_prod_dict[i]:
+                    if x[1].isupper():
+                        ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
+                    else:
+                        ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
+        bot.send_message(msg.chat.id, message, reply_markup=ans)
+    else:
+        bot.send_message(msg.chat.id, 'Вы не авторизованы')
+
+
+@bot.callback_query_handler(func=lambda msg: 'c' in msg.data.split(','))
+def show_products_in_category(msg):
+    """
+    отображение продуктов в категории если продуктов больше 10-ти
+    :param msg:
+    """
+    list_dict = form_list_dict(msg.message)
+    keyboard = types.InlineKeyboardMarkup(row_width=((len(list_dict[msg.data.split(',')[1]]) - 1) // 10) + 1)
+    for i in list_dict[msg.data.split(',')[1]]:
+        if i[1].isupper():
+            keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p,{i}'))
+        else:
+            keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p,{i}'))
+    bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id,
+                                  reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split(','))
+def remove_product(msg):
+    family = db.read_table('Users_database', column='id', value=msg.chat.id)[2]
+    if db.remove_record(family, column='Product', value=msg.data.split(',')[1]):
+        bot.send_message(msg.message.chat.id, f'{msg.data.split(",")[1]} успешно вычеркнут(а) из списка')
+    else:
+        bot.send_message(msg.message.chat.id, f'{msg.data.split(",")[1]} удалить не удалось :(')
+    cat_prod_dict = form_list_dict(msg.message)
+    message = 'Список покупок:\n'
+    for category in cat_prod_dict:
+        message += '\n' + category + ':\n'
+        for product in cat_prod_dict[category]:
+            message += f'{cat_prod_dict[category].index(product) + 1}) {product}'
+    ans = types.InlineKeyboardMarkup(row_width=2)
+    if len(cat_prod_dict.values()) >= 10:
+        for i in cat_prod_dict:
+            ans.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
+    else:
+        for i in cat_prod_dict:
+            for x in cat_prod_dict[i]:
+                if x[1].isupper():
+                    ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
+                else:
+                    ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
+    bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=message,
+                          reply_markup=ans)
+    if msg.data.split(',')[1].isupper():
+        notify('del', msg.data.split(',')[1], family)
 
 
 # TODO Временно отключено
@@ -367,7 +307,7 @@ def start_message(message):
 #         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
 
 
-#TODO переделать
+# TODO переделать
 
 # @bot.message_handler(func=lambda msg: msg.chat.id == cur_id and pass_to_keyword)
 # def add_keyword(msg):
@@ -401,29 +341,9 @@ def start_message(message):
 #     bot.send_message(msg.chat.id, f'{msg.text} добавлен(а) в список ключевых слов')
 
 
-# TODO УДАЛИТЬ???
-
-# @bot.message_handler(func=lambda msg: '/add' in msg.text.split())
-# def add_person(msg):
-#     """
-#     добавление человека в семью
-#     :param msg:
-#     """
-#     if msg.chat.username == 'artem_pas':
-#         if len(msg.text.split()) == 1:
-#             bot.send_message(msg.chat.id, 'Пример команды добавления\n/add 703247892\n/add id:int')
-#         else:
-#             with open('Family;participants.csv', 'a', encoding='UTF-8') as writer:
-#                 writer.write(f',{msg.text.split()[1]}')
-#             bot.send_message(msg.chat.id, f'{msg.text.split()[1]} добавлен(а) в семью')
-#             bot.send_message(msg.text.split()[1], '@artem_pas пригласил вас в семью')
-#     else:
-#         bot.send_message(msg.chat.id, '❌У вас нет доступа к этой команде❌')
-
-
 @bot.message_handler(commands=['clear_list'])
 def clear_list(msg):
-    if UA(msg.chat.id):
+    if len(db.read_table('Users_database', column='id', value=msg.chat.id)) != 0:
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton('✅ Да, удалить!', callback_data=str(msg.chat.id) + '&clear&yes'))
         keyboard.add(types.InlineKeyboardButton('❌ Нет, не удалять', callback_data=str(msg.chat.id) + '&clear&no'))
@@ -431,38 +351,42 @@ def clear_list(msg):
                          'Вы уверены, что хотите полностью очистить список?\n❗️ЭТО ДЕЙСТВИЕ БУДЕТ НЕВОЗМОЖНО ОТМЕНИТЬ❗️',
                          reply_markup=keyboard)
     else:
-        bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
+        bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
 @bot.callback_query_handler(func=lambda msg: msg.data.split('&')[1] == 'clear')
 def clear_confirmed(msg):
-    if UA(msg.message.chat.id):
-        msg.data = [str(i) for i in msg.data.split('&')]
-        if msg.data[2] == 'yes':
-            with open(login + '.csv', 'w', encoding='UTF-8') as file:
-                file.write('Category,Product\n')
-            bot.edit_message_text('Список успешно очищен', chat_id=msg.message.chat.id,
+    msg.data = [str(i) for i in msg.data.split('&')]
+    if msg.data[2] == 'yes':
+        if db.remove_record(db.read_table('Users_database',
+                                          column='id',
+                                          value=msg.message.chat.id),
+                            '*',
+                            '*'):
+            bot.edit_message_text('Список успешно очищен',
+                                  chat_id=msg.message.chat.id,
                                   message_id=msg.message.message_id)
-            global list
-            list = {}
         else:
-            bot.edit_message_text('Очистка отменена', chat_id=msg.message.chat.id, message_id=msg.message.message_id)
+            bot.edit_message_text('Во время очистки произошла ошибка, обратитесь к @artem_pas',
+                                  chat_id=msg.message.chat.id,
+                                  message_id=msg.message.message_id)
     else:
-        bot.send_message(msg.chat.id, 'СОВСЕМ ОБНАГЛЕЛ?')
+        bot.edit_message_text('Очистка отменена', chat_id=msg.message.chat.id, message_id=msg.message.message_id)
 
 
-@bot.message_handler(func=lambda msg: waiting_notification)
+@bot.message_handler(func=lambda msg: waiting_notification and msg.chat.username == 'artem_pas')
 def notification(msg):
     global waiting_notification
     waiting_notification = False
-    access_file = open('Family;participants.csv', encoding='UTF-8')
-    for x in access_file:
-        for i in x.split(','):
-            print(i)
-            if not i[0].isdigit():
-                continue
-            bot.send_message(i, msg.text)
-    access_file.close()
+    users = db.read_table('Users_database')
+    errors = []
+    for user in users:
+        try:
+            bot.send_message(user[1], msg.text)
+        except Exception as e:
+            errors.append(str(user[1]) + ' - ' + str(e))
+    if len(errors) > 0:
+        bot.send_message(354640082, str(errors))
 
 
 # TODO ПЕРЕДЕЛАТЬ КАТЕГОРИЗАЦИЮ
@@ -510,12 +434,12 @@ def notification(msg):
 
 @bot.message_handler(commands=['notify'])
 def notif(msg):
-    if UA(msg.chat.id):
+    if msg.chat.username == 'artem_pas':
         bot.send_message(msg.chat.id, 'Enter notification text:')
         global waiting_notification
         waiting_notification = True
     else:
-        pass
+        bot.send_message(msg.chat.id, 'This command is unavailable for you')
 
 
 if __name__ == '__main__':
