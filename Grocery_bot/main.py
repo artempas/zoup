@@ -5,13 +5,14 @@
 from telebot import *
 import os
 import traceback
-import database as db
+from Grocery_bot import database_module as db  # TODO исправить перед заливом
 import mytoken
 
 currently_forbidden_familynames = ['families', 'category_product', 'users_database']
 transfering_logins = {}
 bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
+waiting_notification = False
 db.create_table('Users_database', {'User_id': 'INTEGER', 'Username': 'TEXT', 'Family': 'TEXT'})
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
 
@@ -22,14 +23,20 @@ def form_list_dict(msg):
     :param msg:
     :return:
     """
-    family = db.read_table('Users_database', column='id', value=msg.chat.id)[2]
+    family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
     cat_prod = db.read_table(family)
+    print('form_list_dict -> orig', cat_prod)
     cat_prod_dict = {}
     for line in cat_prod:
         if line[0] in cat_prod_dict.keys():
             cat_prod_dict[line[0]].append(line[1])
         else:
-            cat_prod_dict[line[0]] = []
+            cat_prod_dict[line[0]] = [line[1]]
+    if 'Другое' in cat_prod_dict.keys():
+        if list(cat_prod_dict.keys())[-1] != 'Другое':
+            temp = cat_prod_dict['Другое']
+            del (cat_prod_dict['Другое'])
+            cat_prod_dict['Другое'] = temp
     return cat_prod_dict
 
 
@@ -213,74 +220,84 @@ def show_list(msg):
     отображение списка продуктов
     :param msg:
     """
-    if len(db.read_table('Users_database', column='id', value=msg.chat.id)) != 0:
+    if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
         cat_prod_dict = form_list_dict(msg)
+        print(cat_prod_dict)
         message = 'Список покупок:\n'
         for category in cat_prod_dict:
             message += '\n' + category + ':\n'
             for product in cat_prod_dict[category]:
-                message += f'{cat_prod_dict[category].index(product) + 1}) {product}'
+                message += f'{cat_prod_dict[category].index(product) + 1}) {product}\n'
         ans = types.InlineKeyboardMarkup(row_width=2)
-        if len(cat_prod_dict.values()) >= 10:
+        lena = 0
+        for i in cat_prod_dict:
+            for x in cat_prod_dict[i]:
+                lena += 1
+        if lena >= 10:
             for i in cat_prod_dict:
-                ans.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
+                ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
         else:
             for i in cat_prod_dict:
                 for x in cat_prod_dict[i]:
                     if x[1].isupper():
-                        ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
+                        ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p&{x}'))
                     else:
-                        ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
+                        ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p&{x}'))
         bot.send_message(msg.chat.id, message, reply_markup=ans)
     else:
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
-@bot.callback_query_handler(func=lambda msg: 'c' in msg.data.split(','))
+@bot.callback_query_handler(func=lambda msg: 'c' in msg.data.split('&'))
 def show_products_in_category(msg):
     """
     отображение продуктов в категории если продуктов больше 10-ти
     :param msg:
     """
     list_dict = form_list_dict(msg.message)
-    keyboard = types.InlineKeyboardMarkup(row_width=((len(list_dict[msg.data.split(',')[1]]) - 1) // 10) + 1)
-    for i in list_dict[msg.data.split(',')[1]]:
+    keyboard = types.InlineKeyboardMarkup(row_width=((len(list_dict[msg.data.split('&')[1]]) - 1) // 10) + 1)
+    for i in list_dict[msg.data.split('&')[1]]:
         if i[1].isupper():
-            keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p,{i}'))
+            keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p&{i}'))
         else:
-            keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p,{i}'))
+            keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p&{i}'))
     bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id,
                                   reply_markup=keyboard)
 
 
-@bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split(','))
+@bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split('&'))
 def remove_product(msg):
-    family = db.read_table('Users_database', column='id', value=msg.chat.id)[2]
-    if db.remove_record(family, column='Product', value=msg.data.split(',')[1]):
-        bot.send_message(msg.message.chat.id, f'{msg.data.split(",")[1]} успешно вычеркнут(а) из списка')
+    family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
+    if db.remove_record(family, column_name='Product', value=msg.data.split('&')[1]):
+        bot.send_message(msg.message.chat.id, f'{msg.data.split("&")[1]} успешно вычеркнут(а) из списка')
     else:
-        bot.send_message(msg.message.chat.id, f'{msg.data.split(",")[1]} удалить не удалось :(')
+        bot.send_message(msg.message.chat.id, f'{msg.data.split("&")[1]} удалить не удалось :(')
     cat_prod_dict = form_list_dict(msg.message)
     message = 'Список покупок:\n'
     for category in cat_prod_dict:
         message += '\n' + category + ':\n'
         for product in cat_prod_dict[category]:
-            message += f'{cat_prod_dict[category].index(product) + 1}) {product}'
+            message += f'{cat_prod_dict[category].index(product) + 1}) {product}\n'
     ans = types.InlineKeyboardMarkup(row_width=2)
-    if len(cat_prod_dict.values()) >= 10:
+    lena = 0
+    for i in cat_prod_dict:
+        for x in cat_prod_dict[i]:
+            lena += 1
+    if lena >= 10:
         for i in cat_prod_dict:
-            ans.add(types.InlineKeyboardButton(i, callback_data=f'c,{i}'))
+            ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
     else:
         for i in cat_prod_dict:
             for x in cat_prod_dict[i]:
                 if x[1].isupper():
-                    ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p,{x}'))
+                    ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p&{x}'))
                 else:
-                    ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p,{x}'))
+                    ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p&{x}'))
     bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=message,
                           reply_markup=ans)
-    if msg.data.split(',')[1].isupper():
-        notify('del', msg.data.split(',')[1], family)
+    print(msg.data)
+    if msg.data.split('&')[1].isupper():
+        notify('del', msg.data.split('&')[1], family)
 
 
 # TODO Временно отключено
@@ -343,7 +360,7 @@ def remove_product(msg):
 
 @bot.message_handler(commands=['clear_list'])
 def clear_list(msg):
-    if len(db.read_table('Users_database', column='id', value=msg.chat.id)) != 0:
+    if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton('✅ Да, удалить!', callback_data=str(msg.chat.id) + '&clear&yes'))
         keyboard.add(types.InlineKeyboardButton('❌ Нет, не удалять', callback_data=str(msg.chat.id) + '&clear&no'))
@@ -358,11 +375,8 @@ def clear_list(msg):
 def clear_confirmed(msg):
     msg.data = [str(i) for i in msg.data.split('&')]
     if msg.data[2] == 'yes':
-        if db.remove_record(db.read_table('Users_database',
-                                          column='id',
-                                          value=msg.message.chat.id),
-                            '*',
-                            '*'):
+        family = db.read_table('Users_database', column_name='id',value=msg.message.chat.id)[0][2]
+        if db.remove_record(family, '*', '*'):
             bot.edit_message_text('Список успешно очищен',
                                   chat_id=msg.message.chat.id,
                                   message_id=msg.message.message_id)
@@ -390,46 +404,51 @@ def notification(msg):
 
 
 # TODO ПЕРЕДЕЛАТЬ КАТЕГОРИЗАЦИЮ
-# @bot.message_handler(content_types=['text'])
-# def add_product(msg):
-#     """
-#     добавление продукта в список
-#     :param msg:
-#     """
-#     global file
-#     category = "Другое"
-#     if UA(msg.chat.id):
-#         if len(msg.text) > 62:
-#             msg.text = msg.text[0:63]
-#         text = [str(i).lower() for i in coma_to_dot(msg.text).split()]
-#         found = False
-#         for i in text:
-#             if found:
-#                 break
-#             elif i[0].isdigit():
-#                 continue
-#             else:
-#                 for x in category_product:
-#                     if i in category_product[x]:
-#                         category = x
-#                         found = True
-#         if 'срочно' in msg.text.lower():
-#             txt = ''
-#             for i in coma_to_dot(msg.text).split():
-#                 if i.lower() == 'срочно':
-#                     continue
-#                 else:
-#                     txt += i.upper() + ' '
-#             with open(login + '.csv', 'a', encoding='UTF-8') as file:
-#                 file.write(category + ',' + txt + '\n')
-#             bot.send_message(msg.chat.id, txt + ' успешно добавлен(а) в список, как срочный продукт')
-#             notify('add', txt)
-#         else:
-#             with open(login + '.csv', 'a', encoding='UTF-8') as file:
-#                 file.write(category + ',' + coma_to_dot(msg.text).capitalize() + '\n')
-#             bot.send_message(msg.chat.id, coma_to_dot(msg.text) + ' успешно добавлен(а) в список')
-#     else:
-#         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
+@bot.message_handler(content_types=['text'])
+def add_product(msg):
+    """
+    добавление продукта в список
+    :param msg:
+    """
+    if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
+        family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
+        category = "Другое"
+        msg.text = msg.text.replace('&', ' and ')
+        if len(msg.text) > 62:
+            msg.text = msg.text[0:63]
+        found = False
+        for word in msg.text.split():
+            if found:
+                break
+            else:
+                ans = db.read_table('category_product', 'product', word.lower())
+                if len(ans) > 0:
+                    found = True
+                    category = ans[0][1]
+                    break
+        if not found:
+            category = 'Другое'
+        if 'срочно' in msg.text.lower():
+            txt = ''
+            for i in msg.text.split():
+                if i.lower() == 'срочно':
+                    continue
+                else:
+                    txt += i.upper() + ' '
+            add_ans = db.add_record(family, (category, txt))
+            if add_ans == 'Success':
+                bot.send_message(msg.chat.id, txt + ' успешно добавлен(а) в список, как срочный продукт')
+                notify('add', txt, family)
+            else:
+                bot.send_message(msg.chat.id, add_ans)
+        else:
+            add_ans = db.add_record(family, (category, msg.text))
+            if add_ans == 'Success':
+                bot.send_message(msg.chat.id, msg.text + ' успешно добавлен(а) в список')
+            else:
+                bot.send_message(msg.chat.id, add_ans)
+    else:
+        bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
 
 
 @bot.message_handler(commands=['notify'])
