@@ -8,8 +8,7 @@ import traceback
 from Grocery_bot import database_module as db  # TODO исправить перед заливом
 import mytoken
 
-currently_forbidden_familynames = ['families', 'category_product', 'users_database']
-transfering_logins = {}
+currently_forbidden_familynames = ['families', 'category_product', 'users_database', 'transfering_logins']
 bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
 waiting_notification = False
@@ -40,22 +39,7 @@ def form_list_dict(msg):
     return cat_prod_dict
 
 
-def coma_to_dot(txt: str):
-    """
-    преобразование всех запятых в тексте в точки
-    :param txt:
-    :return:
-    """
-    res = ''
-    for i in txt:
-        if i == ',':
-            res += '.'
-        else:
-            res += i
-    return res
-
-
-def notify(do, product, family):
+def notify(do, product, family, username=None):
     """
     уведомление всех участников семьи о покупке или добавлении в список
     срочного продукта
@@ -68,81 +52,13 @@ def notify(do, product, family):
         if user[2] == family:
             print(user[1])
             try:
-                bot.send_message(user[0],
-                                 f'{product.capitalize()} {"куплен(a)" * int(do == "del") + "необходимо купить❗️" * int(do == "add")}')
+                if do == 'del' or do == 'add':
+                    bot.send_message(user[0],
+                                     username + 'срочно просит купить'* int(do == "add") + 'купил(a)'*int(do == "del")+{product.capitalize()})
+                elif do == 'welcome':
+                    bot.send_message(user[0], f'@{product} присоединился(ась) к семье')
             except Exception as e:
                 traceback.print_exc()
-                bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
-
-
-def check(text: str):
-    """
-    проверка на наличие 'срочно' в тексте
-    :param text:
-    :return:
-    """
-    text = text.lower()
-    return 'срочно' in text
-
-
-def append_tuple(a: tuple, b: str):
-    """
-    добавление элемента в кортеж
-    :param a:
-    :param b:
-    :return:
-    """
-    temp = []
-    for i in a:
-        temp.append(i)
-    temp.append(b)
-    return tuple(temp)
-
-
-# TODO append_file ПОСМОТРЕТЬ ЗАЧЕМ НУЖНА
-def append_file(filename: str, category: str, keyword: str):
-    """
-    добавление значения в файл
-    :param filename: имя файла
-    :param category: категория в которую надо добавить элемент
-    :param keyword: элемент
-    """
-    dummyfile = filename + '.bak'
-    with open(filename, encoding='UTF-8') as orig_file, open(dummyfile, 'w',
-                                                             encoding='UTF-8') as temp_file:
-        for line in orig_file:
-            if line.split(';')[0] == category:
-                temp_file.write(line[:-1] + ',' + keyword + '\n')
-            else:
-                temp_file.write(line)
-    os.remove(filename)
-    os.rename(dummyfile, filename)
-
-
-# TODO нужна ли?
-def delete_line(original_file, line_number):
-    """ Delete a line from a file at the given line number """
-    is_skipped = False
-    current_index = 0
-    dummy_file = original_file + '.bak'
-    # Open original file in read only mode and dummy file in write mode
-    with open(original_file, encoding='UTF-8') as read_obj, open(dummy_file, 'w',
-                                                                 encoding='UTF-8') as write_obj:
-        # Line by line copy data from original file to dummy file
-        for line in read_obj:
-            # If current line number matches the given line number then skip copying
-            if current_index != line_number:
-                write_obj.write(line)
-            else:
-                is_skipped = True
-            current_index += 1
-
-    # If any line is skipped then rename dummy file as original file
-    if is_skipped:
-        os.remove(original_file)
-        os.rename(dummy_file, original_file)
-    else:
-        os.remove(dummy_file)
 
 
 @bot.message_handler(commands=['help'])
@@ -178,31 +94,78 @@ def create_family(msg):
     not_in_db = True
     families = db.read_table('Families')
     for family in families:
-        if family[0] != entered_family:
-            continue
-        else:
+        if family[0] == entered_family:
             not_in_db = False
-    if entered_family not in currently_forbidden_familynames and not_in_db and entered_family not in transfering_logins.values():
+    not_in_transfering_logins = True
+    for family_name in db.read_table('Transfering_logins'):
+        if family_name[1] == entered_family:
+            not_in_transfering_logins = False
+    if entered_family not in currently_forbidden_familynames and not_in_db and not_in_transfering_logins:
         bot.send_message(msg.chat.id, 'Логин удовлетворяет условиям\nВведите пароль:')
         bot.register_next_step_handler(msg, final_register)
-        transfering_logins[msg.chat.id] = entered_family
+        db.add_record('transfering_logins', (msg.chat.id, entered_family))
     else:
         bot.send_message(msg.chat.id, 'Такой логин уже существует, попробуйте другой')
-        bot.register_next_step_handler(msg, final_register)
+        bot.register_next_step_handler(msg, create_family)
 
 
 def final_register(msg):
+    login = db.read_table('transfering_logins', 'chat_id', msg.chat.id)[0][1]
     password = msg.text
-    bot.send_message(msg.chat.id, db.add_record('Families', (transfering_logins[msg.chat.id], password)))
-    db.create_table(transfering_logins[msg.chat.id], {'Category': 'TEXT', 'Product': 'TEXT'})
+    bot.send_message(msg.chat.id, db.add_record('Families', (login, password)))
+    db.create_table(login, {'Category': 'TEXT', 'Product': 'TEXT'})
     bot.send_message(msg.chat.id,
-                     db.add_record('Users_database', (msg.chat.id, msg.chat.username, transfering_logins[msg.chat.id])))
-    bot.send_message(msg.chat.id,
-                     f'Семья успешно создана\nЛогин - {transfering_logins[msg.chat.id]}\nПароль - {password}')
-    del (transfering_logins[msg.chat.id])
+                     db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+    if db.remove_record('Transfering_logins', 'chat_id', msg.chat.id):
+        bot.send_message(msg.chat.id, f'Семья успешно создана\nЛогин - {login}\nПароль - {password}')
+    else:
+        bot.send_message(msg.chat.id, 'Что-то пошло не так, попробуйте ещё раз\n/register')
 
 
-'''ДОЮСДА ГОТОВО'''
+@bot.message_handler(commands=['join'])
+def log_in__ask_login(msg):
+    bot.send_message(msg.chat.id, 'Логин:')
+    bot.register_next_step_handler(msg, log_in__enter_login)
+
+
+def log_in__enter_login(msg):
+    if len(db.read_table('Families', column_name='Family', value=msg.text.lower())) > 0:
+        db.add_record('Transfering_logins', (msg.chat.id, msg.text.lower()))
+        bot.send_message(msg.chat.id, 'Введите пароль:')
+        bot.register_next_step_handler(msg, log_in__enter_password)
+    else:
+        bot.send_message(msg.chat.id, 'Семья не найдена, попробуйте еще раз\nЛогин:')
+        bot.register_next_step_handler(msg, log_in__enter_login)
+
+
+def log_in__enter_password(msg):
+    try:
+        login = db.read_table('Transfering_logins', column_name='chat_id', value=msg.chat.id)[0][1]
+    except IndexError or ValueError:
+        bot.send_message(msg.chat.id, 'Попробуйте пройти процесс входа заново\n/join')
+        return None
+    if db.read_table('Families', 'Family', login)[0][1] == msg.text:
+        bot.send_message(msg.chat.id, db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+        bot.send_message(msg.chat.id, f'Вы вошли в семью {login}')
+        notify('welcome', msg.chat.username, login)
+    else:
+        keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+        keyboard.add(types.KeyboardButton('Попробовать ввести логин ещё раз'))
+        keyboard.add(types.KeyboardButton('Попробовать ввести пароль ещё раз'))
+        keyboard.add(types.KeyboardButton('Отмена'))
+        bot.send_message(msg.chat.id, 'Неверный пароль\nПопробовать ещё раз?', reply_markup=keyboard)
+        bot.register_next_step_handler(msg, wrong_password)
+
+
+def wrong_password(msg):
+    if msg.text == 'Попробовать ввести логин ещё раз':
+        bot.send_message(msg.chat.id, 'Логин:', reply_markup=types.ReplyKeyboardRemove())
+        bot.register_next_step_handler(msg, log_in__enter_login)
+    elif msg.text == 'Попробовать ввести пароль ещё раз':
+        bot.send_message(msg.chat.id, 'Пароль:', reply_markup=types.ReplyKeyboardRemove())
+        bot.register_next_step_handler(msg, log_in__enter_password)
+    else:
+        bot.send_message(msg.chat.id, 'Процедура входа отменена', reply_markup=types.ReplyKeyboardRemove())
 
 
 @bot.message_handler(commands=['start'])
@@ -297,7 +260,7 @@ def remove_product(msg):
                           reply_markup=ans)
     print(msg.data)
     if msg.data.split('&')[1].isupper():
-        notify('del', msg.data.split('&')[1], family)
+        notify('del', msg.data.split('&')[1], family, msg.message.chat.username)
 
 
 # TODO Временно отключено
@@ -321,7 +284,7 @@ def remove_product(msg):
 #         cur_id = msg.chat.id
 #         pass_to_keyword = True
 #     else:
-#         bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
+#         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
 # TODO переделать
@@ -375,7 +338,7 @@ def clear_list(msg):
 def clear_confirmed(msg):
     msg.data = [str(i) for i in msg.data.split('&')]
     if msg.data[2] == 'yes':
-        family = db.read_table('Users_database', column_name='id',value=msg.message.chat.id)[0][2]
+        family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
         if db.remove_record(family, '*', '*'):
             bot.edit_message_text('Список успешно очищен',
                                   chat_id=msg.message.chat.id,
@@ -403,7 +366,6 @@ def notification(msg):
         bot.send_message(354640082, str(errors))
 
 
-# TODO ПЕРЕДЕЛАТЬ КАТЕГОРИЗАЦИЮ
 @bot.message_handler(content_types=['text'])
 def add_product(msg):
     """
@@ -438,7 +400,7 @@ def add_product(msg):
             add_ans = db.add_record(family, (category, txt))
             if add_ans == 'Success':
                 bot.send_message(msg.chat.id, txt + ' успешно добавлен(а) в список, как срочный продукт')
-                notify('add', txt, family)
+                notify('add', txt, family, msg.chat.username)
             else:
                 bot.send_message(msg.chat.id, add_ans)
         else:
@@ -448,7 +410,7 @@ def add_product(msg):
             else:
                 bot.send_message(msg.chat.id, add_ans)
     else:
-        bot.send_message(msg.chat.id, 'Для получания доступа к боту обратитесь к @artem_pas')
+        bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
 @bot.message_handler(commands=['notify'])
@@ -461,11 +423,13 @@ def notif(msg):
         bot.send_message(msg.chat.id, 'This command is unavailable for you')
 
 
-if __name__ == '__main__':
-    while True:
-        try:
-            bot.polling(none_stop=True)
-        except Exception as e:
-            traceback.print_exc()
-            bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
-            time.sleep(1)
+bot.enable_save_next_step_handlers(2)
+bot.load_next_step_handlers()
+
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        traceback.print_exc()
+        bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
+        time.sleep(1)

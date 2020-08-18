@@ -1,6 +1,4 @@
-
 import sqlite3
-
 
 database_path = 'main_database.db'
 con = sqlite3.connect(database_path)
@@ -63,7 +61,7 @@ def remove_record(table_name: str, column_name: str, value: str):
             else:
                 cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = {value}')
         except Exception as e:
-            print("DATABASE: "+str(e))
+            print("DATABASE: " + str(e))
             return False
         con.commit()
         return True
@@ -90,3 +88,7 @@ def read_table(table_name: str, column_name=None, value=None):
             return cur.fetchall()
         except UnicodeEncodeError:
             pass
+
+
+if __name__ == '__main__':
+    print(read_table('Families', 'Family', 'artem_pas_fam')[0][1])
