@@ -3,8 +3,6 @@
 """
 
 from telebot import *
-import os
-import traceback
 from Grocery_bot import database_module as db  # TODO исправить перед заливом
 import mytoken
 
@@ -61,7 +59,7 @@ def notify(do, product, family, username=None):
                 elif do == 'change':
                     bot.send_message(user[0], f'@{username} сменил пароль семьи\nНовый пароль - {product}')
             except Exception as e:
-                traceback.print_exc()
+                print(str(e))
 
 
 @bot.message_handler(commands=['help'])
@@ -150,6 +148,7 @@ def log_in__enter_password(msg):
     if db.read_table('Families', 'Family', login)[0][1] == msg.text:
         bot.send_message(msg.chat.id, db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
         bot.send_message(msg.chat.id, f'Вы вошли в семью {login}')
+        db.remove_record('Transfering_logins', column_name='chat_id', value=msg.chat.id)
         notify('welcome', msg.chat.username, login)
     else:
         keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
@@ -309,62 +308,48 @@ def quit2(msg):
                              'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен')
 
 
-# TODO Временно отключено
-
-# @bot.message_handler(commands=['add_keyword'])
-# def choose_category(msg):
-#     """
-#     начало добавления ключевого слова
-#     запрос категории
-#     :param msg:
-#     """
-#     if UA(msg.chat.id):
-#         global keyboard
-#         keyboard = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
-#         for i in category_product:
-#             keyboard.add(types.KeyboardButton(i))
-#         bot.send_message(msg.chat.id, 'Выберите категорию в которую вы хотите добавить ключевое слово',
-#                          reply_markup=keyboard)
-#         global cur_id
-#         global pass_to_keyword
-#         cur_id = msg.chat.id
-#         pass_to_keyword = True
-#     else:
-#         bot.send_message(msg.chat.id, 'Вы не авторизованы')
+@bot.message_handler(commands=['add_keyword'])
+def choose_category(msg):
+    """
+    начало добавления ключевого слова
+    запрос категории
+    :param msg:
+    """
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
+    categories = []
+    for i in db.read_table('Category_product'):
+        if i[1] not in categories:
+            categories.append(i[1])
+    for i in categories:
+        keyboard.add(types.KeyboardButton(i))
+    bot.send_message(msg.chat.id, 'Выберите категорию в которую вы хотите добавить ключевое слово',
+                     reply_markup=keyboard)
+    bot.register_next_step_handler(msg, ask_keyword)
 
 
-# TODO переделать
-
-# @bot.message_handler(func=lambda msg: msg.chat.id == cur_id and pass_to_keyword)
-# def add_keyword(msg):
-#     """
-#     запрос ключевого слова
-#     :param msg:
-#     """
-#     global category
-#     global pass_to_keyword
-#     global pass_to_add
-#     category = msg.text
-#     bot.send_message(msg.chat.id, 'Введите ключевое слово:', reply_markup=types.ReplyKeyboardRemove())
-#     pass_to_keyword = False
-#     pass_to_add = True
+def ask_keyword(msg):
+    """
+    запрос ключевого слова
+    :param msg:
+    """
+    db.add_record('Transfering_logins', (msg.chat.id, f'&{msg.text}&'))
+    bot.send_message(msg.chat.id, 'Введите ключевое слово:')
+    bot.register_next_step_handler(msg, add_keyword)
 
 
-# TODO на переработку
 
-# @bot.message_handler(func=lambda msg: cur_id == msg.chat.id and pass_to_add)
-# def adding_keyword(msg):
-#     """
-#     добавление полученного ключевого слова
-#     :param msg:
-#     """
-#     global pass_to_add
-#     global cur_id
-#     pass_to_add = False
-#     cur_id = 0
-#     category_product[category] = append_tuple(category_product[category], msg.text)
-#     append_file('Category_product.csv', category, msg.text)
-#     bot.send_message(msg.chat.id, f'{msg.text} добавлен(а) в список ключевых слов')
+def add_keyword(msg):
+    """
+    добавление полученного ключевого слова
+    :param msg:
+    """
+    category = db.read_table('transfering_logins', 'chat_id', msg.chat.id)
+    if not db.remove_record('transfering_logins', 'chat_id', msg.chat.id):
+        return None
+    bot.send_message(msg.chat.id,
+                     db.add_record('category_product', (msg.text, category)))
+    bot.send_message(msg.chat.id, f'{msg.text} добавлен(а) в список ключевых слов')
+    bot.send_message(354640082, f'@{msg.chat.username} добавил(а) ключевое слово\nCategory - {category}\nProduct - {msg.text}')
 
 
 @bot.message_handler(commands=['clear_list'])
@@ -476,6 +461,6 @@ while True:
     try:
         bot.polling(none_stop=True)
     except Exception as e:
-        traceback.print_exc()
+        print(str(e))
         bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
         time.sleep(1)
