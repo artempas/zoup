@@ -293,14 +293,14 @@ def remove_product(msg):
 @bot.message_handler(commands=['quit_family'])
 def quit(msg):
     keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    keyboard.add(types.KeyboardButton(':key: Выйти из семьи'))
-    keyboard.add(types.KeyboardButton(':x: Отмена'))
+    keyboard.add(types.KeyboardButton('Выйти из семьи'))
+    keyboard.add(types.KeyboardButton('Отмена'))
     bot.send_message(msg.chat.id, 'Вы уверены что хотите выйти из семьи?', reply_markup=keyboard)
     bot.register_next_step_handler(msg, quit2)
 
 
 def quit2(msg):
-    if msg.text == ':key: Выйти из семьи':
+    if msg.text == 'Выйти из семьи':
         if db.remove_record('Users_database', 'id', msg.chat.id):
             bot.send_message(msg.chat.id, 'Вы вышли из семьи')
         else:

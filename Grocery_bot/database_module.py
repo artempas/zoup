@@ -94,7 +94,17 @@ def update_record(table: str, column_name: str, search_value, new_value, change_
     if change_column is None:
         change_column = column_name
     try:
-        cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = {search_value}')
+        if type(search_value) == int:
+            if type(new_value) == int:
+                cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = {search_value}')
+            else:
+                cur.execute(f'UPDATE {table} SET {change_column} = "{new_value}" WHERE {column_name} = {search_value}')
+        else:
+            if type(new_value) == int:
+                cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = "{search_value}"')
+            else:
+                cur.execute(f'UPDATE {table} SET {change_column} = "{new_value}" WHERE {column_name} = "{search_value}"')
+
         con.commit()
         return True
     except Exception as e:
