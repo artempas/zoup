@@ -37,7 +37,7 @@ def form_list_dict(msg):
     return cat_prod_dict
 
 
-def notify(do, product, family, username=None):
+def notify(do, product, family, username, sender):
     """
     уведомление всех участников семьи о покупке или добавлении в список
     срочного продукта
@@ -45,15 +45,16 @@ def notify(do, product, family, username=None):
     :param product:
     """
     print('GOT TO NOTIFY')
-    users_list = db.read_table('Users_database')
+    users_list = db.read_table('Users_database', column_name='family', value=family)
     for user in users_list:
-        if user[2] == family:
-            print(user[1])
+        if user[0] == sender:
+            continue
+        else:
             try:
                 if do == 'del' or do == 'add':
                     bot.send_message(user[0],
-                                     username + 'срочно просит купить' * int(do == "add") + 'купил(a)' * int(
-                                         do == "del") + {product.capitalize()})
+                                     "@" + username + ' срочно просит купить ' * int(do == "add") + ' купил(a) ' * int(
+                                         do == "del") + product.capitalize())
                 elif do == 'welcome':
                     bot.send_message(user[0], f'@{product} присоединился(ась) к семье')
                 elif do == 'change':
@@ -78,9 +79,6 @@ def helper(msg):
                      '/register - создать семью\n'
                      '/join - присоединиться к существующей семье\n\n\n'
                      'Created by: @artem_pas')
-
-
-'''ОТСЮДА ГОТОВО'''
 
 
 @bot.message_handler(commands=['register'])
@@ -115,8 +113,15 @@ def final_register(msg):
     password = msg.text
     bot.send_message(msg.chat.id, db.add_record('Families', (login, password)))
     db.create_table(login, {'Category': 'TEXT', 'Product': 'TEXT'})
-    bot.send_message(msg.chat.id,
-                     db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+    if msg.chat.username is not None:
+        bot.send_message(msg.chat.id,
+                         db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+    else:
+        bot.send_message(msg.chat.id,
+                         db.add_record('Users_database', (msg.chat.id, msg.chat.first_name, login)))
+        bot.send_message(msg.chat.id, 'У вашего аккаунта отсутствует никнейм, для корректного отображения рекомендуем '
+                                      'вам создать его, а после перезайти в семью с помощью /quit /join\n'
+                                      'Создать никнейм можно через вкладку "Настройки"')
     if db.remove_record('Transfering_logins', 'chat_id', msg.chat.id):
         bot.send_message(msg.chat.id, f'Семья успешно создана\nЛогин - {login}\nПароль - {password}')
     else:
@@ -134,8 +139,11 @@ def log_in__enter_login(msg):
         db.add_record('Transfering_logins', (msg.chat.id, msg.text.lower()))
         bot.send_message(msg.chat.id, 'Введите пароль:')
         bot.register_next_step_handler(msg, log_in__enter_password)
+    elif msg.text[0] == '/':
+        bot.send_message(msg.chat.id, 'Вход отменен')
+        return
     else:
-        bot.send_message(msg.chat.id, 'Семья не найдена, попробуйте еще раз\nЛогин:')
+        bot.send_message(msg.chat.id, 'Семья не найдена, попробуйте еще раз\nЧтобы отменить вход вызовите любую команду\nЛогин:')
         bot.register_next_step_handler(msg, log_in__enter_login)
 
 
@@ -146,10 +154,21 @@ def log_in__enter_password(msg):
         bot.send_message(msg.chat.id, 'Попробуйте пройти процесс входа заново\n/join')
         return None
     if db.read_table('Families', 'Family', login)[0][1] == msg.text:
-        bot.send_message(msg.chat.id, db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+        if msg.chat.username is not None:
+            bot.send_message(msg.chat.id,
+                             db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
+            notify('welcome', msg.chat.username, login, None, msg.chat.id)
+        else:
+            bot.send_message(msg.chat.id,
+                             db.add_record('Users_database', (msg.chat.id, msg.chat.first_name, login)))
+            bot.send_message(msg.chat.id,
+                             'У вашего аккаунта отсутствует никнейм, для корректного отображения рекомендуем '
+                             'вам создать его, а после перезайти в семью с помощью /quit_family /join\n'
+                             'Создать никнейм можно через вкладку "Настройки"')
+            notify('welcome', msg.chat.first_name, login, None, msg.chat.id)
         bot.send_message(msg.chat.id, f'Вы вошли в семью {login}')
         db.remove_record('Transfering_logins', column_name='chat_id', value=msg.chat.id)
-        notify('welcome', msg.chat.username, login)
+
     else:
         keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
         keyboard.add(types.KeyboardButton('Попробовать ввести логин ещё раз'))
@@ -197,7 +216,10 @@ def change_password2(msg):
     family = db.read_table('Users_database', 'id', msg.chat.id)[0][2]
     if db.update_record('Families', column_name='Family', search_value=family, change_column='password',
                         new_value=msg.text):
-        notify('change', msg.text, family, msg.chat.username)
+        if msg.chat.username is not None:
+            notify('change', msg.text, family, msg.chat.username, msg.chat.id)
+        else:
+            notify('change', msg.text, family, msg.chat.first_name, msg.chat.id)
     else:
         bot.send_message(msg.chat.id,
                          'При смене пароля произошла ошибка, попробуйте позже\nВы всегда можете воспользоваться /show_password')
@@ -286,7 +308,10 @@ def remove_product(msg):
                           reply_markup=ans)
     print(msg.data)
     if msg.data.split('&')[1].isupper():
-        notify('del', msg.data.split('&')[1], family, msg.message.chat.username)
+        if msg.message.chat.username is not None:
+            notify('del', msg.data.split('&')[1], family, msg.message.chat.username, msg.message.chat.id)
+        else:
+            notify('del', msg.data.split('&')[1], family, msg.message.chat.first_name, msg.message.chat.id)
 
 
 @bot.message_handler(commands=['quit_family'])
@@ -301,11 +326,11 @@ def quit(msg):
 def quit2(msg):
     if msg.text == 'Выйти из семьи':
         if db.remove_record('Users_database', 'id', msg.chat.id):
-            bot.send_message(msg.chat.id, 'Вы вышли из семьи')
+            bot.send_message(msg.chat.id, 'Вы вышли из семьи', reply_markup=types.ReplyKeyboardRemove)
         else:
             bot.send_message(354640082, f'@{msg.chat.username} не смог выйти из семьи\n chat_id - {msg.chat.id}')
             bot.send_message(msg.chat.id,
-                             'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен')
+                             'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен', reply_markup=types.ReplyKeyboardRemove)
 
 
 @bot.message_handler(commands=['add_keyword'])
@@ -333,7 +358,7 @@ def ask_keyword(msg):
     :param msg:
     """
     db.add_record('Transfering_logins', (msg.chat.id, f'&{msg.text}&'))
-    bot.send_message(msg.chat.id, 'Введите ключевое слово:')
+    bot.send_message(msg.chat.id, 'Введите ключевое слово:', reply_markup=types.ReplyKeyboardRemove)
     bot.register_next_step_handler(msg, add_keyword)
 
 
@@ -431,7 +456,10 @@ def add_product(msg):
             add_ans = db.add_record(family, (category, txt))
             if add_ans == 'Success':
                 bot.send_message(msg.chat.id, txt + ' успешно добавлен(а) в список, как срочный продукт')
-                notify('add', txt, family, msg.chat.username)
+                if msg.chat.username is not None:
+                    notify('add', txt, family, msg.chat.username, msg.chat.id)
+                else:
+                    notify('add', txt, family, msg.chat.first_name, msg.chat.id)
             else:
                 bot.send_message(msg.chat.id, add_ans)
         else:
