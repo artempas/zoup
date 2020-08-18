@@ -54,9 +54,12 @@ def notify(do, product, family, username=None):
             try:
                 if do == 'del' or do == 'add':
                     bot.send_message(user[0],
-                                     username + 'срочно просит купить'* int(do == "add") + 'купил(a)'*int(do == "del")+{product.capitalize()})
+                                     username + 'срочно просит купить' * int(do == "add") + 'купил(a)' * int(
+                                         do == "del") + {product.capitalize()})
                 elif do == 'welcome':
                     bot.send_message(user[0], f'@{product} присоединился(ась) к семье')
+                elif do == 'change':
+                    bot.send_message(user[0], f'@{username} сменил пароль семьи\nНовый пароль - {product}')
             except Exception as e:
                 traceback.print_exc()
 
@@ -177,6 +180,30 @@ def start_message(message):
     helper(message)
 
 
+@bot.message_handler(commands=['show_password'])
+def show_password(msg):
+    if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
+        family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
+        password = db.read_table('families', column_name='Family', value=family)[0][1]
+        bot.send_message(msg.chat.id, f'Логин семьи - {family}\nПароль - {password}')
+
+
+@bot.message_handler(commands=['change_password'])
+def change_password(msg):
+    bot.send_message(msg.chat.id, 'Введите новый пароль:')
+    bot.register_next_step_handler(msg, change_password2)
+
+
+def change_password2(msg):
+    family = db.read_table('Users_database', 'id', msg.chat.id)[0][2]
+    if db.update_record('Families', column_name='Family', search_value=family, change_column='password',
+                        new_value=msg.text):
+        notify('change', msg.text, family, msg.chat.username)
+    else:
+        bot.send_message(msg.chat.id,
+                         'При смене пароля произошла ошибка, попробуйте позже\nВы всегда можете воспользоваться /show_password')
+
+
 @bot.message_handler(commands=['list'])
 def show_list(msg):
     """
@@ -261,6 +288,25 @@ def remove_product(msg):
     print(msg.data)
     if msg.data.split('&')[1].isupper():
         notify('del', msg.data.split('&')[1], family, msg.message.chat.username)
+
+
+@bot.message_handler(commands=['quit_family'])
+def quit(msg):
+    keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    keyboard.add(types.KeyboardButton(':key: Выйти из семьи'))
+    keyboard.add(types.KeyboardButton(':x: Отмена'))
+    bot.send_message(msg.chat.id, 'Вы уверены что хотите выйти из семьи?', reply_markup=keyboard)
+    bot.register_next_step_handler(msg, quit2)
+
+
+def quit2(msg):
+    if msg.text == ':key: Выйти из семьи':
+        if db.remove_record('Users_database', 'id', msg.chat.id):
+            bot.send_message(msg.chat.id, 'Вы вышли из семьи')
+        else:
+            bot.send_message(354640082, f'@{msg.chat.username} не смог выйти из семьи\n chat_id - {msg.chat.id}')
+            bot.send_message(msg.chat.id,
+                             'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен')
 
 
 # TODO Временно отключено

@@ -40,7 +40,7 @@ def add_record(table_name: str, value: iter):
 
 def remove_record(table_name: str, column_name: str, value: str):
     """
-    Удаляет запись из таблицы, в случае возникновения ошибки - возвращает её
+    Удаляет запись из таблицы Вывод -> Bool
     :param table_name:
     :param column_name:
     :param value:
@@ -88,6 +88,18 @@ def read_table(table_name: str, column_name=None, value=None):
             return cur.fetchall()
         except UnicodeEncodeError:
             pass
+
+
+def update_record(table: str, column_name: str, search_value, new_value, change_column=None):
+    if change_column is None:
+        change_column = column_name
+    try:
+        cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = {search_value}')
+        con.commit()
+        return True
+    except Exception as e:
+        print(str(e))
+        return False
 
 
 if __name__ == '__main__':
