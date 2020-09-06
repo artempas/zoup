@@ -3,10 +3,11 @@
 """
 
 from telebot import *
-from Grocery_bot import database_module as db  # TODO исправить перед заливом
+import database_module as db
 import mytoken
+from datetime import datetime
 
-currently_forbidden_familynames = ['families', 'category_product', 'users_database', 'transfering_logins']
+currently_forbidden_familynames = ['families', 'category_product', 'users_database', 'transfering_logins', 'block_list', 'report']
 bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
 waiting_notification = False
@@ -15,9 +16,7 @@ db.create_table('Users_database', {'User_id': 'INTEGER', 'Username': 'TEXT', 'Fa
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
 db.create_table('Transfering_logins', {'chat_id': 'INTEGER', 'login': 'TEXT'})
 db.create_table('block_list', {'chat_id': "INTEGER", 'Username': 'TEXT', 'Reason': 'TEXT', 'Date': 'TEXT'})
-block_list = []
-for i in db.read_table('block_list'):
-    block_list.append(i[0])
+block_list = [i[0] for i in db.read_table('block_list')]
 
 
 def form_list_dict(msg):
@@ -49,7 +48,7 @@ def notify(do, product, family, username, sender):
     :param do:
     :param product:
     """
-    print(f'{sender}(@{username}) - notify')
+    print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {sender}(@{username}) - notify ({do})')
     users_list = db.read_table('Users_database', column_name='family', value=family)
     for user in users_list:
         if user[0] == sender:
@@ -74,24 +73,33 @@ def helper(msg):
     Вывод сообщения помощи
     :param msg:
     """
-    print(f'{msg.chat.id}(@{msg.chat.username}) - help')
-    bot.send_message(msg.chat.id,
-                     'Бот, созданный для помощи в составлении списка покупок семьям.\n\n\n'
-                     '/start - команда начинающая ваше взаимодействие с ботом, в случае, если у вас появятся проблемы с авторизацией - пропишите её\n\n'
-                     '/list - показывает список покупок и позволяет вычёркивать купленные продукты, в случае, если продуктов больше 10 - показывает категории, по нажатию на которые, вы увидите продукты в данной категории\n\n'
-                     '/add_keyword - если вы заметили, что определённый продукт оказывается в категории "Другое", но его можно определить в одну из существующих категорий нажмите на эту команду и следуйте инструкциям\n\n\n'
-                     'Чтобы добавить продукт просто напишите его в этот чат, помимо самого продукта можно писать необходимое количество, комментарии и всё что вашей душе угодно\n\n'
-                     '/help - выведет это сообщение\n'
-                     '/register - создать семью\n'
-                     '/join - присоединиться к существующей семье\n\n\n'
-                     'Created by: @artem_pas')
+    if msg.chat.id not in block_list:
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - help')
+        bot.send_message(msg.chat.id,
+                         'Бот, созданный для помощи в составлении списка покупок семьям.\n\n\n'
+                         '/start - команда начинающая ваше взаимодействие с ботом, в случае, если у вас появятся проблемы с авторизацией - пропишите её\n\n'
+                         '/list - показывает список покупок и позволяет вычёркивать купленные продукты, в случае, если продуктов больше 10 - показывает категории, по нажатию на которые, вы увидите продукты в данной категории\n\n'
+                         '/add_keyword - если вы заметили, что определённый продукт оказывается в категории "Другое", но его можно определить в одну из существующих категорий нажмите на эту команду и следуйте инструкциям\n\n\n'
+                         'Чтобы добавить продукт просто напишите его в этот чат, помимо самого продукта можно писать необходимое количество, комментарии и всё что вашей душе угодно\n\n'
+                         '/help - выведет это сообщение\n'
+                         '/register - создать семью\n'
+                         '/join - присоединиться к существующей семье\n\n\n'
+                         'Created by: @artem_pas')
+    else:
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton('Обжаловать', callback_data='bl&report'))
+        kb.add(types.InlineKeyboardButton('Показать причину', callback_data='bl&show_reason'))
+        bot.send_message(msg.chat.id,
+                         'Вы были заблокированы, если вы не согласны с причиной блокировки, вы всегда можете её обжаловать',
+                         reply_markup=kb)
 
 
 @bot.message_handler(commands=['register'])
 def register(msg):
     if msg.chat.id not in block_list:
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) == 0:
-            print(f'{msg.chat.id}(@{msg.chat.username}) - register(begin)')
+            print(
+                f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - register(begin)')
             bot.send_message(msg.chat.id, 'Придумайте логин для семьи:')
             bot.register_next_step_handler(msg, create_family)
         else:
@@ -99,9 +107,11 @@ def register(msg):
 
 
 def create_family(msg):
-    print(f'{msg.chat.id}(@{msg.chat.username}) - register(entered login)')
+    print(
+        f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - register(entered login)')
     global currently_forbidden_familynames
     entered_family = msg.text.lower()
+    entered_family = entered_family.replace(' ', '_')
     not_in_db = True
     families = db.read_table('Families')
     for family in families:
@@ -135,7 +145,7 @@ def final_register(msg):
                                       'вам создать его, а после перезайти в семью с помощью /quit /join\n'
                                       'Создать никнейм можно через вкладку "Настройки"')
     if db.remove_record('Transfering_logins', 'chat_id', msg.chat.id):
-        print(f'{msg.chat.id}(@{msg.chat.username}) - registered')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - registered')
         bot.send_message(msg.chat.id, f'Семья успешно создана\nЛогин - {login}\nПароль - {password}')
     else:
         bot.send_message(msg.chat.id, 'Что-то пошло не так, попробуйте ещё раз\n/register')
@@ -145,7 +155,7 @@ def final_register(msg):
 def log_in__ask_login(msg):
     if msg.chat.id not in block_list:
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) == 0:
-            print(f'{msg.chat.id}(@{msg.chat.username}) - log_in(start)')
+            print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - log_in(start)')
             bot.send_message(msg.chat.id, 'Логин:')
             bot.register_next_step_handler(msg, log_in__enter_login)
         else:
@@ -153,7 +163,8 @@ def log_in__ask_login(msg):
 
 
 def log_in__enter_login(msg):
-    print(f'{msg.chat.id}(@{msg.chat.username}) - log_in(continue)')
+    print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - log_in(continue)')
+    msg.text = msg.text.replace(' ', '_')
     if len(db.read_table('Families', column_name='Family', value=msg.text.lower())) > 0:
         db.add_record('Transfering_logins', (msg.chat.id, msg.text.lower()))
         bot.send_message(msg.chat.id, 'Введите пароль:')
@@ -188,7 +199,7 @@ def log_in__enter_password(msg):
             notify('welcome', msg.chat.first_name, login, None, msg.chat.id)
         bot.send_message(msg.chat.id, f'Вы вошли в семью {login}')
         db.remove_record('Transfering_logins', column_name='chat_id', value=msg.chat.id)
-        print(f'{msg.chat.id}(@{msg.chat.username}) - log_in(complete)')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - log_in(complete)')
 
     else:
         keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
@@ -200,7 +211,7 @@ def log_in__enter_password(msg):
 
 
 def wrong_password(msg):
-    print(f'{msg.chat.id}(@{msg.chat.username}) - wrong_password')
+    print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - wrong_password')
     if msg.text == 'Попробовать ввести логин ещё раз':
         bot.send_message(msg.chat.id, 'Логин:', reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, log_in__enter_login)
@@ -217,7 +228,7 @@ def start_message(message):
     Запуск бота
     """
     if message.chat.id not in block_list:
-        print(f'{message.chat.id}(@{message.chat.username}) - start')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {message.chat.id}(@{message.chat.username}) - start')
         helper(message)
     else:
         bot.send_message(message.chat, 'U R STILL BLOCKED\nВЫ ВСЕ ЕЩЁ ЗАБЛОКИРОВАНЫ')
@@ -226,7 +237,7 @@ def start_message(message):
 @bot.message_handler(commands=['show_password'])
 def show_password(msg):
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - show_password')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - show_password')
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
             family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
             password = db.read_table('families', column_name='Family', value=family)[0][1]
@@ -236,13 +247,13 @@ def show_password(msg):
 @bot.message_handler(commands=['change_password'])
 def change_password(msg):
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - change_password')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - change_password')
         bot.send_message(msg.chat.id, 'Введите новый пароль:')
         bot.register_next_step_handler(msg, change_password2)
 
 
 def change_password2(msg):
-    print(f'{msg.chat.id}(@{msg.chat.username}) - change_password2')
+    print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - change_password2')
     family = db.read_table('Users_database', 'id', msg.chat.id)[0][2]
     if db.update_record('Families', column_name='Family', search_value=family, change_column='password',
                         new_value=msg.text):
@@ -262,7 +273,7 @@ def show_list(msg):
     :param msg:
     """
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - show_list')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - show_list')
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
             cat_prod_dict = form_list_dict(msg)
             message = 'Список покупок:\n'
@@ -323,7 +334,7 @@ def show_products_in_category(msg):
 @bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split('&'))
 def remove_product(msg):
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - remove_product')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - remove_product')
         family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
         if 'cut' not in msg.data.split('&'):
             if db.remove_record(family, column_name='Product', value=msg.data.split('&')[1]):
@@ -383,7 +394,7 @@ def remove_product(msg):
 @bot.message_handler(commands=['quit_family'])
 def quit(msg):
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - quit')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - quit')
         keyboard = types.ReplyKeyboardMarkup(one_time_keyboard=True)
         keyboard.add(types.KeyboardButton('Выйти из семьи'))
         keyboard.add(types.KeyboardButton('Отмена'))
@@ -393,14 +404,14 @@ def quit(msg):
 
 def quit2(msg):
     if msg.text == 'Выйти из семьи':
-        print(f'{msg.chat.id}(@{msg.chat.username}) - quit2(yes)')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - quit2(yes)')
         if db.remove_record('Users_database', 'id', msg.chat.id):
             bot.send_message(msg.chat.id, 'Вы вышли из семьи', reply_markup=types.ReplyKeyboardRemove())
         else:
             bot.send_message(354640082, f'@{msg.chat.username} не смог выйти из семьи\n chat_id - {msg.chat.id}')
             bot.send_message(msg.chat.id,
                              'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен',
-                             reply_markup=types.ReplyKeyboardRemove)
+                             reply_markup=types.ReplyKeyboardRemove())
 
 
 @bot.message_handler(commands=['add_keyword'])
@@ -411,7 +422,7 @@ def choose_category(msg):
     :param msg:
     """
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - add_keyword(start)')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - add_keyword(start)')
         keyboard = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
         categories = []
         for i in db.read_table('Category_product'):
@@ -429,7 +440,8 @@ def ask_keyword(msg):
     запрос ключевого слова
     :param msg:
     """
-    print(f'{msg.chat.id}(@{msg.chat.username}) - add_keyword(chosen_category)')
+    print(
+        f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - add_keyword(chosen_category)')
     db.add_record('Transfering_logins', (msg.chat.id, f'&{msg.text}&'))
     bot.send_message(msg.chat.id, 'Введите ключевое слово:', reply_markup=types.ReplyKeyboardRemove())
     bot.register_next_step_handler(msg, add_keyword)
@@ -441,7 +453,8 @@ def add_keyword(msg):
     :param msg:
     """
     category = db.read_table('transfering_logins', 'chat_id', msg.chat.id)
-    print(f'{msg.chat.id}(@{msg.chat.username}) - add_keyword(added ({msg.text} -> {category}))')
+    print(
+        f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - add_keyword(added ({msg.text} -> {category}))')
     if not db.remove_record('transfering_logins', 'chat_id', msg.chat.id):
         return None
     bot.send_message(msg.chat.id,
@@ -454,7 +467,7 @@ def add_keyword(msg):
 @bot.message_handler(commands=['clear_list'])
 def clear_list(msg):
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - clear_list')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - clear_list')
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
             keyboard = types.InlineKeyboardMarkup()
             keyboard.add(types.InlineKeyboardButton('✅ Да, удалить!', callback_data=str(msg.chat.id) + '&clear&yes'))
@@ -471,7 +484,8 @@ def clear_confirmed(msg):
     if msg.chat.id not in block_list:
         msg.data = [str(i) for i in msg.data.split('&')]
         if msg.data[2] == 'yes':
-            print(f'{msg.chat.id}(@{msg.chat.username}) - clear_confirmed')
+            print(
+                f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - clear_confirmed')
             family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
             if db.remove_record(family, '*', '*'):
                 bot.edit_message_text('Список успешно очищен',
@@ -492,14 +506,16 @@ def add_product(msg):
     :param msg:
     """
     if msg.chat.id not in block_list:
-        print(f'{msg.chat.id}(@{msg.chat.username}) - add_product')
+        print(f'{datetime.now().strftime("%D.%M.%Y %H:%M")} - {msg.chat.id}(@{msg.chat.username}) - add_product')
         if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
-            family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
             category = "Другое"
+            family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
             msg.text = msg.text.replace('&', ' and ')
             if len(msg.text) > 62:
                 msg.text = msg.text[0:63]
             found = False
+            if 'срочно' in msg.text.lower():
+                msg.text = msg.text.upper().replace('СРОЧНО', '')
             for word in msg.text.split():
                 if found:
                     break
@@ -511,7 +527,7 @@ def add_product(msg):
                         break
             if not found:
                 category = 'Другое'
-            if 'срочно' in msg.text.lower():
+            if msg.text.isupper():
                 txt = ''
                 for i in msg.text.split():
                     if i.lower() == 'срочно':
@@ -535,6 +551,47 @@ def add_product(msg):
                     bot.send_message(msg.chat.id, add_ans)
         else:
             bot.send_message(msg.chat.id, 'Вы не авторизованы\nИспользуйте /join или /register')
+
+
+@bot.callback_query_handler(func=lambda dat: "bl" == dat.data.split('&')[0])
+def block(dat):
+    action = dat.data.split('&')[1]
+    if action == 'show_reason':
+        if len(dat.data.split('&')) == 2:
+            bot.answer_callback_query(dat.id, db.read_table('block_list', 'id', dat.message.chat.id)[2])
+        else:
+            info = db.read_table('block_list', 'chat_id', dat.data.split('&')[2])[0]
+            bot.answer_callback_query(dat.id, 'info gotten')
+            bot.send_message(dat.message.chat.id, f'Chat id - {info[0]}\nUsername - @{info[1]}\nReason - {info[2]}\nDate - {info[3]}\nReoprt_id - {info[4]}')
+    elif action == 'report':
+        bot.answer_callback_query(dat.id, 'Введите текст вашего обращения')
+        bot.send_message(dat.message.chat.id, 'Введите текст вашего обращения:')
+        bot.register_next_step_handler_by_chat_id(dat.message.chat.id, send_report)
+    elif action == 'reply':
+        bot.answer_callback_query(dat.id, 'Текст ответа:')
+        bot.register_next_step_handler_by_chat_id(dat.message.chat.id, reply_report)
+    elif action == 'unblock':
+        if db.remove_record('block_list', 'chat_id', dat.data.split('&')[2]):
+            bot.answer_callback_query('dat.id', 'Unblocked!:)')
+
+
+def send_report(msg):
+    record = db.read_table('block_list', 'chat_id', msg.chat.id)
+    if db.remove_record('block_list', 'chat_id', msg.chat.id):
+        bot.send_message(msg.chat.id, db.add_record('transfering logins', (msg.chat.id, 'report')))
+        record.append(msg.id)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton('Ответить', callback_data='bl&reply'))
+        kb.add(types.InlineKeyboardButton('Разблокировать', callback_data=f'bl&unblock&{msg.chat.id}'))
+        kb.add(types.InlineKeyboardButton('Показать сведения', callback_data=f'bl&show_reason&{msg.chat.id}'))
+        bot.send_message(msg.chat.id, db.add_record('block_list', record))
+        bot.send_message(354640082, f"Новое обращение:\n{msg.text}\nchat_id - {msg.chat.id}\nusername - @{msg.chat.username}\nfirst_name - {msg.chat.first_name}", reply_markup=kb)
+
+
+def reply_report(msg):
+    chat_id = db.read_table('transfering_logins', 'login', 'report')[0][0]
+    bot.send_message(chat_id, msg.text, reply_to_message_id=db.read_table('block_list', 'chat_id', chat_id)[0][4])
+    bot.send_message(msg.chat.id, 'Sent')
 
 
 @bot.message_handler(commands=['notify'])

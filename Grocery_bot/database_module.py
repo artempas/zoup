@@ -113,4 +113,4 @@ def update_record(table: str, column_name: str, search_value, new_value, change_
 
 
 if __name__ == '__main__':
-    print(read_table('Families', 'Family', 'artem_pas_fam')[0][1])
+    print(read_table('Users_database', column_name='id', value=263946778)[0][2])
