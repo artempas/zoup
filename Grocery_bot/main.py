@@ -482,6 +482,75 @@ def clear_confirmed(msg):
         bot.edit_message_text('Очистка отменена', chat_id=msg.message.chat.id, message_id=msg.message.message_id)
 
 
+@bot.message_handler(commands=['notify'])
+def notif(msg):
+    if msg.chat.username == 'artem_pas':
+        bot.send_message(msg.chat.id, 'Enter notification text:')
+        bot.register_next_step_handler(msg, notification)
+    else:
+        bot.send_message(msg.chat.id, 'This command is unavailable for you')
+
+
+def notification(msg):
+    users = db.read_table('Users_database')
+    errors = []
+    for user in users:
+        try:
+            bot.send_message(user[0], msg.text)
+        except Exception as e:
+            errors.append(str(user[1]) + ' - ' + str(e))
+    if len(errors) > 0:
+        bot.send_message(354640082, 'Errors:' + str(errors))
+
+
+@bot.message_handler(commands=['admin'])
+def admin_startup(msg):
+    if msg.chat.username == 'artem_pas':
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton('Update', callback_data='a&u'))
+        keyboard.add(types.InlineKeyboardButton('Restart', callback_data='a&r'))
+        keyboard.add(types.InlineKeyboardButton('SQL', callback_data='a&sql'))
+        keyboard.add(types.InlineKeyboardButton('Block user', callback_data='a&b'))
+        bot.send_message(msg.chat.id, 'Select tool', reply_markup=keyboard)
+        bot.disable_save_next_step_handlers()
+    else:
+        bot.send_message(msg.chat.id, 'Access denied')
+
+
+@bot.callback_query_handler(func=lambda cb: 'a' == cb.data.split('&')[0])
+def admin_tool_selection(cb):
+    tool = cb.data.split('&')[1]
+    if tool == 'u':
+        bot.send_message(cb.message.chat.id, 'waiting for update file (0 to cancel)')
+        bot.register_next_step_handler_by_chat_id(cb.message.chat.id, update)
+    elif tool == 'r':
+        if bot.answer_callback_query(cb.id, 'Restarting...'):
+            bot.send_message(cb.message.chat.id, 'restarting')
+            exit()
+    elif tool == 'sql':
+        bot.send_message(cb.message.chat.id, 'now in sql mode (выхожу to cancel)')
+        bot.register_next_step_handler_by_chat_id(cb.message.chat.id, sql)
+    elif tool == "b":
+        bot.send_message(cb.message.chat.id, 'chat_id to block')
+        bot.register_next_step_handler_by_chat_id(cb.message.chat.id, block)
+
+
+def update(msg):
+    file = bot.get_file(msg.document.file_id)
+    loaded = bot.download_file(file.file_path)
+    open('main1.py', 'wb').write(loaded)
+    bot.send_message(msg.chat.id, 'File is downloaded, restarting')
+    exit()
+
+
+def sql(msg):
+    pass
+
+
+def block(msg):
+    pass
+
+
 @bot.message_handler(content_types=['text'])
 def add_product(msg):
     """
@@ -534,25 +603,7 @@ def add_product(msg):
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
-@bot.message_handler(commands=['notify'])
-def notif(msg):
-    if msg.chat.username == 'artem_pas':
-        bot.send_message(msg.chat.id, 'Enter notification text:')
-        bot.register_next_step_handler(msg, notification)
-    else:
-        bot.send_message(msg.chat.id, 'This command is unavailable for you')
 
-
-def notification(msg):
-    users = db.read_table('Users_database')
-    errors = []
-    for user in users:
-        try:
-            bot.send_message(user[0], msg.text)
-        except Exception as e:
-            errors.append(str(user[1]) + ' - ' + str(e))
-    if len(errors) > 0:
-        bot.send_message(354640082, 'Errors:' + str(errors))
 
 
 bot.enable_save_next_step_handlers(2)
