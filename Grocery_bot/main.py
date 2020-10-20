@@ -14,8 +14,51 @@ db.create_table('Users_database', {'User_id': 'INTEGER', 'Username': 'TEXT', 'Fa
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
 
 
-def form_keyboard(listing, category=False):
-    pass
+def form_keyboard(cat_prod_dict, category=False, page=1):
+    message = ''
+    for cat in cat_prod_dict:
+        message += '\n' + cat + ':\n'
+        for product in cat_prod_dict[cat]:
+            message += f'{cat_prod_dict[cat].index(product) + 1}) {product}\n'
+    ans = types.InlineKeyboardMarkup(row_width=2)
+    if type(category) == bool:
+        lena = 0
+        for i in cat_prod_dict:
+            for x in cat_prod_dict[i]:
+                lena += 1
+        if lena > 10:
+            for i in cat_prod_dict:
+                ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
+        else:
+            for i in cat_prod_dict:
+                for x in cat_prod_dict[i]:
+                    if x.isupper():
+                        ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p&{x}'))
+                    else:
+                        ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p&{x}'))
+    else:
+        paged = False
+        if len(cat_prod_dict[category]) > 10:
+            paged = True
+        lena = -1
+        last_index = (page - 1) * 8
+        for i in cat_prod_dict[category][last_index::]:
+            if i.isupper():
+                ans.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p&{i}'))
+            else:
+                ans.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p&{i}'))
+            lena += 1
+            print(len(cat_prod_dict[category]))
+            print(last_index)
+            print(lena)
+            if lena == 7 and paged or len(cat_prod_dict[category]) - last_index == lena + 1:
+                last_index += lena
+                if page != 1:
+                    ans.add(types.InlineKeyboardButton('<=', callback_data=f'c&{category}&{page - 1}&ba'))
+                if ((len(cat_prod_dict[category]) + 1) // 8) + 1 != page:
+                    ans.add(types.InlineKeyboardButton('=>', callback_data=f'c&{category}&{page + 1}&fo'))
+                break
+    return message, ans
 
 
 def form_list_dict(msg):
@@ -99,21 +142,29 @@ def create_family(msg):
     print(f'{msg.chat.id}(@{msg.chat.username}) - register(entered login)')
     global currently_forbidden_familynames
     entered_family = msg.text.lower()
+    entered_family.replace('&', 'and')
     not_in_db = True
     families = db.read_table('Families')
     for family in families:
         if family[0] == entered_family:
             not_in_db = False
     not_in_transfering_logins = True
+    available = True
+    for i in entered_family:
+        if ord(i) >= 41 and ord(i) <= 90 or ord(i) >= 97 and ord(i) <= 122:
+            continue
+        else:
+            available = False
     for family_name in db.read_table('Transfering_logins'):
         if family_name[1] == entered_family:
             not_in_transfering_logins = False
-    if entered_family not in currently_forbidden_familynames and not_in_db and not_in_transfering_logins:
+    if entered_family not in currently_forbidden_familynames and not_in_db and not_in_transfering_logins and available:
         bot.send_message(msg.chat.id, 'Логин удовлетворяет условиям\nВведите пароль:')
         bot.register_next_step_handler(msg, final_register)
         db.add_record('transfering_logins', (msg.chat.id, entered_family))
     else:
-        bot.send_message(msg.chat.id, 'Такой логин уже существует, попробуйте другой')
+        bot.send_message(msg.chat.id,
+                         'Такой логин уже существует или использован недопустимый символ (допустимы только буквы английского алфавита) попробуйте другой')
         bot.register_next_step_handler(msg, create_family)
 
 
@@ -256,7 +307,8 @@ def show_list(msg):
     if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
         cat_prod_dict = form_list_dict(msg)
         message = 'Список покупок:\n'
-        ans = form_keyboard(cat_prod_dict)
+        [mes, ans] = form_keyboard(cat_prod_dict, False)
+        message += mes
         bot.send_message(msg.chat.id, message, reply_markup=ans)
     else:
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
@@ -269,20 +321,14 @@ def show_products_in_category(msg):
     :param msg:
     """
     list_dict = form_list_dict(msg.message)
-    keyboard = types.InlineKeyboardMarkup(row_width=((len(list_dict[msg.data.split('&')[1]]) - 1) // 10) + 1)
-    for i in list_dict[msg.data.split('&')[1]]:
-        try:
-            if i[1].isupper():
-                keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p&{i}'))
-            else:
-                keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p&{i}'))
-        except IndexError as e:
-            if i.isupper():
-                keyboard.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p&{i}'))
-            else:
-                keyboard.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p&{i}'))
-    bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id,
-                                  reply_markup=keyboard)
+    if len(msg.data.split('&')) > 2:
+        ans = form_keyboard(list_dict, msg.data.split('&')[1], int(msg.data.split('&')[2]))[1]
+        bot.answer_callback_query(msg.id, '=>' * int(msg.data.split('&')[3] == 'fo') + '<=' * int(
+            msg.data.split('&')[3] == 'ba'))
+    else:
+        ans = form_keyboard(list_dict, msg.data.split('&')[1])[1]
+        bot.answer_callback_query(msg.id, msg.data.split('&')[1])
+    bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id, reply_markup=ans)
 
 
 @bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split('&'))
@@ -337,6 +383,7 @@ def quit2(msg):
     if msg.text == 'Выйти из семьи':
         print(f'{msg.chat.id}(@{msg.chat.username}) - quit2(yes)')
         if db.remove_record('Users_database', 'id', msg.chat.id):
+            bot.answer_callback_query(msg.id, 'Success')
             bot.send_message(msg.chat.id, 'Вы вышли из семьи', reply_markup=types.ReplyKeyboardRemove())
         else:
             bot.send_message(354640082, f'@{msg.chat.username} не смог выйти из семьи\n chat_id - {msg.chat.id}')
@@ -371,7 +418,7 @@ def ask_keyword(msg):
     запрос ключевого слова
     :param msg:
     """
-    if len(db.read_table('Category_product', 'category', msg.text))!=0:
+    if len(db.read_table('Category_product', 'category', msg.text)) != 0:
         print(f'{msg.chat.id}(@{msg.chat.username}) - add_keyword(chosen_category)')
         db.add_record('Transfering_logins', (msg.chat.id, f'&{msg.text}&'))
         bot.send_message(msg.chat.id, 'Введите ключевое слово или отмена:', reply_markup=types.ReplyKeyboardRemove())
@@ -423,6 +470,7 @@ def clear_confirmed(msg):
         print(f'{msg.message.chat.id}(@{msg.message.chat.username}) - clear_confirmed')
         family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
         if db.remove_record(family, '*', '*'):
+            bot.answer_callback_query(msg.id, 'Cleared')
             bot.edit_message_text('Список успешно очищен',
                                   chat_id=msg.message.chat.id,
                                   message_id=msg.message.message_id)
