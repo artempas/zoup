@@ -1,52 +1,36 @@
 """
 Телеграм бот для составления списка покупок
 """
+from random import randint
 
+from requests import get
 from telebot import *
 import database_module as db  # TODO исправить перед заливом
 import mytoken
+from Product import Product, morph
 
+admin_id = 354640082
 currently_forbidden_familynames = ['families', 'category_product', 'users_database', 'transfering_logins']
 bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
 waiting_notification = False
-db.create_table('Users_database', {'User_id': 'INTEGER', 'Username': 'TEXT', 'Family': 'TEXT'})
+db.create_table('Users_database', {'id': 'INTEGER', 'Username': 'TEXT', 'Family': 'TEXT'})
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
+db.create_table('Transfering_logins', {'chat_id':'INTEGER', 'login':'TEXT'})
 
 
-def form_keyboard(cat_prod_dict, category=False, page=1):
-    message = ''
-    for cat in cat_prod_dict:
-        message += '\n' + cat + ':\n'
-        for product in cat_prod_dict[cat]:
-            message += f'{cat_prod_dict[cat].index(product) + 1}) {product}\n'
+def form_keyboard(cat_prod_dict, category=None, page=1):
+    print("form_keyboard:input: cat_prod_dict = ",cat_prod_dict,'\tcategory = ',category,'\tpage=',page)
     ans = types.InlineKeyboardMarkup(row_width=2)
-    if type(category) == bool:
-        lena = 0
-        for i in cat_prod_dict:
-            for x in cat_prod_dict[i]:
-                lena += 1
-        if lena > 10:
-            for i in cat_prod_dict:
-                ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
-        else:
-            for i in cat_prod_dict:
-                for x in cat_prod_dict[i]:
-                    if x.isupper():
-                        ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p&{x}'))
-                    else:
-                        ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p&{x}'))
-    else:
+    if category is not None and category in cat_prod_dict:
         paged = False
         if len(cat_prod_dict[category]) > 10:
             paged = True
         lena = -1
         last_index = (page - 1) * 8
         for i in cat_prod_dict[category][last_index::]:
-            if i.isupper():
-                ans.add(types.InlineKeyboardButton('✅❗️' + i + '❗️', callback_data=f'p&{i}'))
-            else:
-                ans.add(types.InlineKeyboardButton('✅' + i, callback_data=f'p&{i}'))
+            btn = i.get_button()
+            ans.add(types.InlineKeyboardButton(btn[0], callback_data=btn[1]))
             lena += 1
             print(len(cat_prod_dict[category]))
             print(last_index)
@@ -58,29 +42,22 @@ def form_keyboard(cat_prod_dict, category=False, page=1):
                 if ((len(cat_prod_dict[category]) + 1) // 8) + 1 != page:
                     ans.add(types.InlineKeyboardButton('=>', callback_data=f'c&{category}&{page + 1}&fo'))
                 break
-    return message, ans
-
-
-def form_list_dict(msg):
-    """
-    Формирует словарь {категория:продукт} относящийся к семье отправителя
-    :param msg:
-    :return:
-    """
-    family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
-    cat_prod = db.read_table(family)
-    cat_prod_dict = {}
-    for line in cat_prod:
-        if line[0] in cat_prod_dict.keys():
-            cat_prod_dict[line[0]].append(line[1])
+    else:
+        lena = 0
+        for category in cat_prod_dict:
+                lena += len(cat_prod_dict[category])
+        if lena > 10:
+            for i in cat_prod_dict:
+                ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
         else:
-            cat_prod_dict[line[0]] = [line[1]]
-    if 'Другое' in cat_prod_dict.keys():
-        if list(cat_prod_dict.keys())[-1] != 'Другое':
-            temp = cat_prod_dict['Другое']
-            del (cat_prod_dict['Другое'])
-            cat_prod_dict['Другое'] = temp
-    return cat_prod_dict
+            for category in cat_prod_dict:
+                for product in cat_prod_dict[category]:
+                    btn=product.get_button()
+                    ans.add(types.InlineKeyboardButton(btn[0],callback_data=btn[1]))
+    return ans
+
+
+
 
 
 def notify(do, product, family, username, sender):
@@ -119,7 +96,7 @@ def helper(msg):
     bot.send_message(msg.chat.id,
                      'Бот, созданный для помощи в составлении списка покупок семьям.\n\n\n'
                      '/start - команда начинающая ваше взаимодействие с ботом, в случае, если у вас появятся проблемы с авторизацией - пропишите её\n\n'
-                     '/list - показывает список покупок и позволяет вычёркивать купленные продукты, в случае, если продуктов больше 10 - показывает категории, по нажатию на которые, вы увидите продукты в данной категории\n\n'
+                     '/list - показывает список покупок и позволяет вычёркивать купленные продукты, в случае, если продуктов больше 10 - показывает категории, нажав на которые, вы увидите продукты в данной категории\n\n'
                      '/add_keyword - если вы заметили, что определённый продукт оказывается в категории "Другое", но его можно определить в одну из существующих категорий нажмите на эту команду и следуйте инструкциям\n\n\n'
                      'Чтобы добавить продукт просто напишите его в этот чат, помимо самого продукта можно писать необходимое количество, комментарии и всё что вашей душе угодно\n\n'
                      '/help - выведет это сообщение\n'
@@ -151,7 +128,7 @@ def create_family(msg):
     not_in_transfering_logins = True
     available = True
     for i in entered_family:
-        if ord(i) >= 41 and ord(i) <= 90 or ord(i) >= 97 and ord(i) <= 122:
+        if ord(i) in range(48, 58) or ord(i) in range(65, 91) or ord(i) in range(97, 122):
             continue
         else:
             available = False
@@ -171,8 +148,14 @@ def create_family(msg):
 def final_register(msg):
     login = db.read_table('transfering_logins', 'chat_id', msg.chat.id)[0][1]
     password = msg.text
+    for i in password:
+        if ord(i) in range(48, 58) or ord(i) in range(65, 91) or ord(i) in range(97, 122):
+            continue
+        else:
+            bot.send_message(msg.chat.id, 'В пароле разрешено использовать только буквы латинского алфавита и цифры')
     bot.send_message(msg.chat.id, db.add_record('Families', (login, password)))
-    db.create_table(login, {'Category': 'TEXT', 'Product': 'TEXT'})
+    db.create_table(login, {'Id':'unique','Category': 'TEXT', 'Product': 'TEXT', 'Urgent':'INT'})
+    print('passed create')
     if msg.chat.username is not None:
         bot.send_message(msg.chat.id,
                          db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
@@ -304,12 +287,16 @@ def show_list(msg):
     :param msg:
     """
     print(f'{msg.chat.id}(@{msg.chat.username}) - show_list')
-    if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
-        cat_prod_dict = form_list_dict(msg)
-        message = 'Список покупок:\n'
-        [mes, ans] = form_keyboard(cat_prod_dict, False)
-        message += mes
-        bot.send_message(msg.chat.id, message, reply_markup=ans)
+    family=db.read_table('Users_database', column_name='id', value=msg.chat.id)
+    if len(family) != 0:
+        family=family[0][2]
+        dct=Product(0,'').form_family_dict(family_name=family)
+        text=Product(0,'').form_message_text(dct)
+        if len(dct)!=0:
+            kbd = form_keyboard(dct)
+            bot.send_message(msg.chat.id, text, reply_markup=kbd)
+        else:
+            bot.send_message(msg.chat.id, text)
     else:
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
@@ -320,54 +307,52 @@ def show_products_in_category(msg):
     отображение продуктов в категории если продуктов больше 10-ти
     :param msg:
     """
-    list_dict = form_list_dict(msg.message)
+    list_dict = Product(0,'').form_family_dict(family_name=db.read_table('Users_Database', 'id',msg.message.chat.id)[0][2])
     if len(msg.data.split('&')) > 2:
-        ans = form_keyboard(list_dict, msg.data.split('&')[1], int(msg.data.split('&')[2]))[1]
+        ans = form_keyboard(list_dict, msg.data.split('&')[1], int(msg.data.split('&')[2]))
         bot.answer_callback_query(msg.id, '=>' * int(msg.data.split('&')[3] == 'fo') + '<=' * int(
             msg.data.split('&')[3] == 'ba'))
     else:
-        ans = form_keyboard(list_dict, msg.data.split('&')[1])[1]
+        ans = form_keyboard(list_dict, msg.data.split('&')[1])
         bot.answer_callback_query(msg.id, msg.data.split('&')[1])
     bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id, reply_markup=ans)
 
 
 @bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split('&'))
 def remove_product(msg):
-    print(f'{msg.message.chat.id}(@{msg.message.chat.username}) - remove_product')
-    family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)[0][2]
-    if db.remove_record(family, column_name='Product', value=msg.data.split('&')[1]):
-        bot.answer_callback_query(msg.id, f'{msg.data.split("&")[1]} успешно вычеркнут(а) из списка')
-    else:
-        bot.answer_callback_query(msg.id, f'{msg.data.split("&")[1]} удалить не удалось :(')
-    cat_prod_dict = form_list_dict(msg.message)
-    message = 'Список покупок:\n'
-    for category in cat_prod_dict:
-        message += '\n' + category + ':\n'
-        for product in cat_prod_dict[category]:
-            message += f'{cat_prod_dict[category].index(product) + 1}) {product}\n'
-    ans = types.InlineKeyboardMarkup(row_width=2)
-    lena = 0
-    for i in cat_prod_dict:
-        for x in cat_prod_dict[i]:
-            lena += 1
-    if lena >= 10:
-        for i in cat_prod_dict:
-            ans.add(types.InlineKeyboardButton(i, callback_data=f'c&{i}'))
-    else:
-        for i in cat_prod_dict:
-            for x in cat_prod_dict[i]:
-                if x.isupper():
-                    ans.add(types.InlineKeyboardButton('✅❗️' + x + '❗️', callback_data=f'p&{x}'))
+    family = db.read_table('Users_database', column_name='id', value=msg.message.chat.id)
+    if len(family) != 0:
+        family=family[0][2]
+        print(f'{msg.message.chat.id}(@{msg.message.chat.username}) - remove_product')
+        print(msg.data)
+        try:
+            print("remove product::deleted",db.read_table(family,'id',int(msg.data.split('&')[1])),'\n')
+            deleted=db.read_table(family,'Id',int(msg.data.split('&')[1]))[0]
+            deleted=Product(int(deleted[0]),deleted[2],deleted[1],bool(int(deleted[3])))
+        except IndexError:
+            deleted=None
+        if db.remove_record(family, column_name='Id', value=int(msg.data.split('&')[1])) and deleted is not None:
+            try:
+                bot.answer_callback_query(msg.id, deleted.get_name() + ' успешно ' + morph.parse('вычеркнуто')[0].inflect(
+                    {morph.parse(deleted.get_name().split(' ')[0])[0].tag.gender}).word + ' из списка')
+            except ValueError:
+                bot.answer_callback_query(msg.id, deleted.get_name() + ' успешно вычеркнут(а) в список')
+            dct = Product(0, '').form_family_dict(family)
+            print("remove product::dct", dct)
+            text = Product(0, '').form_message_text(dct)
+            kbd = form_keyboard(dct)
+            bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=text,
+                                  reply_markup=kbd)
+            if deleted.is_urgent():
+                if msg.message.chat.username is not None:
+                    notify('del', msg.data.split('&')[1], family, msg.message.chat.username, msg.message.chat.id)
                 else:
-                    ans.add(types.InlineKeyboardButton('✅' + x, callback_data=f'p&{x}'))
-    bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=message,
-                          reply_markup=ans)
-    if msg.data.split('&')[1].isupper():
-        if msg.message.chat.username is not None:
-            notify('del', msg.data.split('&')[1], family, msg.message.chat.username, msg.message.chat.id)
+                    notify('del', msg.data.split('&')[1], family, msg.message.chat.first_name, msg.message.chat.id)
         else:
-            notify('del', msg.data.split('&')[1], family, msg.message.chat.first_name, msg.message.chat.id)
+            bot.answer_callback_query(msg.id, f'{msg.data.split("&")[1]} удалить не удалось :(')
 
+    else:
+        bot.send_message(msg.message.chat.id, 'Вы не авторизованы')
 
 @bot.message_handler(commands=['quit_family'])
 def quit(msg):
@@ -383,13 +368,14 @@ def quit2(msg):
     if msg.text == 'Выйти из семьи':
         print(f'{msg.chat.id}(@{msg.chat.username}) - quit2(yes)')
         if db.remove_record('Users_database', 'id', msg.chat.id):
-            bot.answer_callback_query(msg.id, 'Success')
             bot.send_message(msg.chat.id, 'Вы вышли из семьи', reply_markup=types.ReplyKeyboardRemove())
         else:
             bot.send_message(354640082, f'@{msg.chat.username} не смог выйти из семьи\n chat_id - {msg.chat.id}')
             bot.send_message(msg.chat.id,
                              'Во время выхода произошла ошибка, заявка направлена модератору, мы уведомим вас когда процесс будет завершен',
                              reply_markup=types.ReplyKeyboardRemove())
+    else:
+        bot.send_message(msg.chat.id, "Отменено", reply_markup=types.ReplyKeyboardRemove())
 
 
 @bot.message_handler(commands=['add_keyword'])
@@ -438,6 +424,7 @@ def add_keyword(msg):
         bot.send_message(msg.chat.id, 'Отменено')
         return None
     if not db.remove_record('transfering_logins', 'chat_id', msg.chat.id):
+        bot.send_message(msg.chat.id, 'Ошибка')
         return None
     if msg.text not in db.read_table('category_product', 'product', msg.text):
         bot.send_message(msg.chat.id,
@@ -544,7 +531,11 @@ def update(msg):
 
 
 def sql(msg):
-    pass
+    if msg.text.lower() == 'выхожу':
+        bot.send_message(msg.chat.id, 'sql mode ended')
+    else:
+        bot.send_message(msg.chat.id, db.run_anything(msg.text))
+        bot.register_next_step_handler_by_chat_id(msg.chat.id, sql)
 
 
 def block(msg):
@@ -560,59 +551,31 @@ def add_product(msg):
     print(f'{msg.chat.id}(@{msg.chat.username}) - add_product')
     if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
         family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
-        category = "Другое"
-        msg.text = msg.text.replace('&', ' and ')
-        msg.text = msg.text.replace('%', 'проц.')
-        if len(msg.text) > 62:
-            msg.text = msg.text[0:63]
-        found = False
-        for word in msg.text.split():
-            if found:
-                break
-            else:
-                ans = db.read_table('category_product', 'product', word.lower())
-                if len(ans) > 0:
-                    found = True
-                    category = ans[0][1]
-                    break
-        if not found:
-            category = 'Другое'
-        if 'срочно' in msg.text.lower():
-            txt = ''
-            for i in msg.text.split():
-                if i.lower() == 'срочно':
-                    continue
-                else:
-                    txt += i.upper() + ' '
-            add_ans = db.add_record(family, (category, txt))
-            if add_ans == 'Success':
-                bot.send_message(msg.chat.id, txt + ' успешно добавлен(а) в список, как срочный продукт')
-                if msg.chat.username is not None:
-                    notify('add', txt, family, msg.chat.username, msg.chat.id)
-                else:
-                    notify('add', txt, family, msg.chat.first_name, msg.chat.id)
-            else:
-                bot.send_message(msg.chat.id, add_ans)
-        else:
-            add_ans = db.add_record(family, (category, msg.text))
-            if add_ans == 'Success':
+        id=randint(10000, 99999)
+        while len(db.read_table(family,'Id',id))!=0:
+            id = randint(00000, 99999)
+        added = Product(id,msg.text)
+        print(added)
+        add_ans = db.add_record(family, (id,added.get_category(),added.get_name(), int(added.is_urgent())))
+        if add_ans == 'Success':
+            try:
+                bot.send_message(msg.chat.id, msg.text + ' успешно ' + morph.parse('добавлен')[0].inflect({morph.parse(msg.text.split(' ')[0])[0].tag.gender, 'pssv'}).word+' в список')
+            except ValueError:
                 bot.send_message(msg.chat.id, msg.text + ' успешно добавлен(а) в список')
-            else:
-                bot.send_message(msg.chat.id, add_ans)
+        else:
+            bot.send_message(msg.chat.id, add_ans)
+
     else:
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 
 
-
-
-
-bot.enable_save_next_step_handlers(2)
+bot.enable_save_next_step_handlers(15)
 bot.load_next_step_handlers()
 
 while True:
     try:
         bot.polling(none_stop=True)
     except Exception as e:
-        print(str(e))
-        bot.send_message(354640082, 'ОШИБКА!!!\n' * 3 + str(e))
+        print(traceback.format_exc())
+        bot.send_message(admin_id, 'ОШИБКА!!!\n' * 3 + str(e))
         time.sleep(1)

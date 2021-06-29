@@ -38,7 +38,7 @@ def add_record(table_name: str, value: iter):
         return f'CRITICAL ERROR\n{str(e)}\nОбратитесь к @artem_pas'
 
 
-def remove_record(table_name: str, column_name: str, value: str):
+def remove_record(table_name: str, column_name: str, value):
     """
     Удаляет запись из таблицы Вывод -> Bool
     :param table_name:
@@ -78,7 +78,10 @@ def read_table(table_name: str, column_name=None, value=None):
     :return:
     """
     if column_name is not None and value is not None:
-        cur.execute(f"SELECT * FROM {table_name} WHERE {column_name}='{value}'")
+        if type(value)==int:
+            cur.execute(f"SELECT * FROM {table_name} WHERE {column_name}={value}")
+        else:
+            cur.execute(f"SELECT * FROM {table_name} WHERE {column_name}='{value}'")
         con.commit()
         return cur.fetchall()
     else:
