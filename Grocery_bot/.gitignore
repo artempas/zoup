@@ -127,12 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-Family.csv
-Family;participants.csv
-.run bot.bat
 mytoken.py
-test.py
-.handler-saves/
 main_database.db
-checker.py
