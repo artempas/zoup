@@ -3,7 +3,6 @@
 """
 from random import randint
 
-from requests import get
 from telebot import *
 import database_module as db  # TODO исправить перед заливом
 import mytoken
