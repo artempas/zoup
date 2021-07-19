@@ -11,13 +11,13 @@ def create_table(table_name: str, column_titles: dict):
     :param column_titles:
     :param table_name: ключ - имя, значение - тип
     """
-    print("DATABASE: ", table_name, column_titles)
-    sql = f'CREATE TABLE IF NOT EXISTS {table_name}('
-    for i in column_titles:
-        sql += i + ' ' + column_titles[i] + ', '
-    sql = sql[:-2] + ')'
-    cur.execute(sql)
-    con.commit()
+
+    cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table_name,))
+    if len(cur.fetchall())==0:
+        cur.execute(f'CREATE TABLE IF NOT EXISTS {table_name}({list(column_titles.keys())[0]} {column_titles[list(column_titles.keys())[0]]});')
+        for i in list(column_titles.keys())[1:]:
+            cur.execute(f'ALTER TABLE {table_name} ADD {i} {column_titles[i]};')
+        con.commit()
 
 
 def add_record(table_name: str, value: iter):
@@ -28,14 +28,16 @@ def add_record(table_name: str, value: iter):
     :return:
     """
     cur.execute(f'PRAGMA TABLE_INFO({table_name})')
-    columns_nubmer = len(cur.fetchall())
-    try:
-        cur.execute(f'INSERT INTO {table_name} VALUES({("?, " * columns_nubmer)[:-2]})', value)
-        con.commit()
-        return 'Success'
-    except Exception as e:
-        print("DATABASE: ", str(e))
-        return f'CRITICAL ERROR\n{str(e)}\nОбратитесь к @artem_pas'
+    if len(value)==len(cur.fetchall()):
+        try:
+            cur.execute(f'INSERT INTO {table_name} VALUES({("?, "*len(value))[:-2]})',tuple(value))
+            con.commit()
+            return 'Success'
+        except Exception as e:
+            print("DATABASE: ", str(e))
+            return f'CRITICAL ERROR\n{str(e)}\nОбратитесь к @artem_pas'
+    else:
+        raise IndexError
 
 
 def remove_record(table_name: str, column_name: str, value):
@@ -56,10 +58,7 @@ def remove_record(table_name: str, column_name: str, value):
         return True
     else:
         try:
-            if type(value) != int:
-                cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = "{value}"')
-            else:
-                cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = {value}')
+            cur.execute(f'DELETE FROM {table_name} WHERE {column_name} = ?',(value,))
         except Exception as e:
             print("DATABASE: " + str(e))
             return False
@@ -78,10 +77,7 @@ def read_table(table_name: str, column_name=None, value=None):
     :return:
     """
     if column_name is not None and value is not None:
-        if type(value)==int:
-            cur.execute(f"SELECT * FROM {table_name} WHERE {column_name}={value}")
-        else:
-            cur.execute(f"SELECT * FROM {table_name} WHERE {column_name}='{value}'")
+        cur.execute(f"SELECT * FROM {table_name} WHERE {column_name} = ?",(value,))
         con.commit()
         return cur.fetchall()
     else:
@@ -92,28 +88,3 @@ def read_table(table_name: str, column_name=None, value=None):
         except UnicodeEncodeError:
             pass
 
-
-def update_record(table: str, column_name: str, search_value, new_value, change_column=None):
-    if change_column is None:
-        change_column = column_name
-    try:
-        if type(search_value) == int:
-            if type(new_value) == int:
-                cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = {search_value}')
-            else:
-                cur.execute(f'UPDATE {table} SET {change_column} = "{new_value}" WHERE {column_name} = {search_value}')
-        else:
-            if type(new_value) == int:
-                cur.execute(f'UPDATE {table} SET {change_column} = {new_value} WHERE {column_name} = "{search_value}"')
-            else:
-                cur.execute(f'UPDATE {table} SET {change_column} = "{new_value}" WHERE {column_name} = "{search_value}"')
-
-        con.commit()
-        return True
-    except Exception as e:
-        print(str(e))
-        return False
-
-
-if __name__ == '__main__':
-    print(read_table('Families', 'Family', 'artem_pas_fam')[0][1])

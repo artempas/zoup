@@ -3,19 +3,23 @@
 """
 from random import randint
 
+from requests import get
 from telebot import *
 import database_module as db  # TODO исправить перед заливом
 import mytoken
 from Product import Product, morph
 
 admin_id = 354640082
-currently_forbidden_familynames = ['families', 'category_product', 'users_database', 'transfering_logins']
+currently_forbidden_family_names = ['families', 'category_product', 'users_database', 'transfering_logins']
 bot = TeleBot(mytoken.token, threaded=False)
 authenticated = False
 waiting_notification = False
 db.create_table('Users_database', {'id': 'INTEGER', 'Username': 'TEXT', 'Family': 'TEXT'})
 db.create_table('Families', {'Family': 'TEXT', 'Password': 'TEXT'})
-db.create_table('Transfering_logins', {'chat_id':'INTEGER', 'login':'TEXT'})
+db.create_table('Transferring_logins', {'chat_id':'INTEGER', 'login':'TEXT'})
+db.create_table('Products_database', {'Id':'unique','Category': 'TEXT', 'Product': 'TEXT', 'Urgent':'INT', 'Family':'TEXT'})
+
+
 
 
 def form_keyboard(cat_prod_dict, category=None, page=1):
@@ -59,13 +63,18 @@ def form_keyboard(cat_prod_dict, category=None, page=1):
 
 
 
-def notify(do, product, family, username, sender):
+def notify(do, product, family, msg):
     """
     уведомление всех участников семьи о покупке или добавлении в список
     срочного продукта
     :param do:
     :param product:
     """
+    sender=msg.chat.id
+    if msg.chat.username is not None:
+        username=msg.chat.username
+    else:
+        username=msg.chat.first_name
     print(f'{sender}(@{username}) - notify')
     users_list = db.read_table('Users_database', column_name='family', value=family)
     for user in users_list:
@@ -74,13 +83,22 @@ def notify(do, product, family, username, sender):
         else:
             try:
                 if do == 'del' or do == 'add':
-                    bot.send_message(user[0],
-                                     "@" + username + ' срочно просит купить ' * int(do == "add") + ' купил(a) ' * int(
-                                         do == "del") + product.capitalize())
+                    try:
+                        bot.send_message(user[0],
+                                         "@" + username + ' срочно просит купить ' * int(do == "add") + morph.parse(' купил ')[0].inflect({morph.parse(username)[0].tag.gender}).word * int(
+                                             do == "del") + product.get_name().capitalize())
+                    except ValueError:
+                        bot.send_message(user[0],
+                                         "@" + username + ' срочно просит купить ' * int(do == "add") +
+                                         ' купил(а) ' * int(
+                                             do == "del") + product.get_name().capitalize())
                 elif do == 'welcome':
-                    bot.send_message(user[0], f'@{product} присоединился(ась) к семье')
+                    bot.send_message(user[0], f'@{username} присоединяется к семье')
                 elif do == 'change':
-                    bot.send_message(user[0], f'@{username} сменил пароль семьи\nНовый пароль - {product}')
+                    try:
+                        bot.send_message(user[0], f'@{username} '+ morph.parse('сменил')[0].inflect({morph.parse(username)[0].tag.gender}).word+f'пароль семьи\nНовый пароль - {product}')
+                    except ValueError:
+                        bot.send_message(user[0], f'@{username} сменил(а) пароль семьи\nНовый пароль - {product}')
             except Exception as e:
                 print(str(e))
 
@@ -94,7 +112,6 @@ def helper(msg):
     print(f'{msg.chat.id}(@{msg.chat.username}) - help')
     bot.send_message(msg.chat.id,
                      'Бот, созданный для помощи в составлении списка покупок семьям.\n\n\n'
-                     '/start - команда начинающая ваше взаимодействие с ботом, в случае, если у вас появятся проблемы с авторизацией - пропишите её\n\n'
                      '/list - показывает список покупок и позволяет вычёркивать купленные продукты, в случае, если продуктов больше 10 - показывает категории, нажав на которые, вы увидите продукты в данной категории\n\n'
                      '/add_keyword - если вы заметили, что определённый продукт оказывается в категории "Другое", но его можно определить в одну из существующих категорий нажмите на эту команду и следуйте инструкциям\n\n\n'
                      'Чтобы добавить продукт просто напишите его в этот чат, помимо самого продукта можно писать необходимое количество, комментарии и всё что вашей душе угодно\n\n'
@@ -116,7 +133,7 @@ def register(msg):
 
 def create_family(msg):
     print(f'{msg.chat.id}(@{msg.chat.username}) - register(entered login)')
-    global currently_forbidden_familynames
+    global currently_forbidden_family_names
     entered_family = msg.text.lower()
     entered_family.replace('&', 'and')
     not_in_db = True
@@ -124,7 +141,7 @@ def create_family(msg):
     for family in families:
         if family[0] == entered_family:
             not_in_db = False
-    not_in_transfering_logins = True
+    not_in_transferring_logins = True
     available = True
     for i in entered_family:
         if ord(i) in range(48, 58) or ord(i) in range(65, 91) or ord(i) in range(97, 122):
@@ -133,8 +150,8 @@ def create_family(msg):
             available = False
     for family_name in db.read_table('Transfering_logins'):
         if family_name[1] == entered_family:
-            not_in_transfering_logins = False
-    if entered_family not in currently_forbidden_familynames and not_in_db and not_in_transfering_logins and available:
+            not_in_transferring_logins = False
+    if entered_family not in currently_forbidden_family_names and not_in_db and not_in_transferring_logins and available:
         bot.send_message(msg.chat.id, 'Логин удовлетворяет условиям\nВведите пароль:')
         bot.register_next_step_handler(msg, final_register)
         db.add_record('transfering_logins', (msg.chat.id, entered_family))
@@ -153,8 +170,6 @@ def final_register(msg):
         else:
             bot.send_message(msg.chat.id, 'В пароле разрешено использовать только буквы латинского алфавита и цифры')
     bot.send_message(msg.chat.id, db.add_record('Families', (login, password)))
-    db.create_table(login, {'Id':'unique','Category': 'TEXT', 'Product': 'TEXT', 'Urgent':'INT'})
-    print('passed create')
     if msg.chat.username is not None:
         bot.send_message(msg.chat.id,
                          db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
@@ -206,7 +221,7 @@ def log_in__enter_password(msg):
         if msg.chat.username is not None:
             bot.send_message(msg.chat.id,
                              db.add_record('Users_database', (msg.chat.id, msg.chat.username, login)))
-            notify('welcome', msg.chat.username, login, None, msg.chat.id)
+            notify('welcome', None, login, msg)
         else:
             bot.send_message(msg.chat.id,
                              db.add_record('Users_database', (msg.chat.id, msg.chat.first_name, login)))
@@ -270,13 +285,11 @@ def change_password2(msg):
     family = db.read_table('Users_database', 'id', msg.chat.id)[0][2]
     if db.update_record('Families', column_name='Family', search_value=family, change_column='password',
                         new_value=msg.text):
-        if msg.chat.username is not None:
-            notify('change', msg.text, family, msg.chat.username, msg.chat.id)
-        else:
-            notify('change', msg.text, family, msg.chat.first_name, msg.chat.id)
+        notify('change', msg.text, family, msg)
     else:
         bot.send_message(msg.chat.id,
-                         'При смене пароля произошла ошибка, попробуйте позже\nВы всегда можете воспользоваться /show_password')
+                         'При смене пароля произошла ошибка, попробуйте позже\nВы всегда можете воспользоваться '
+                         '/show_password')
 
 
 @bot.message_handler(commands=['list'])
@@ -306,15 +319,18 @@ def show_products_in_category(msg):
     отображение продуктов в категории если продуктов больше 10-ти
     :param msg:
     """
-    list_dict = Product(0,'').form_family_dict(family_name=db.read_table('Users_Database', 'id',msg.message.chat.id)[0][2])
-    if len(msg.data.split('&')) > 2:
-        ans = form_keyboard(list_dict, msg.data.split('&')[1], int(msg.data.split('&')[2]))
-        bot.answer_callback_query(msg.id, '=>' * int(msg.data.split('&')[3] == 'fo') + '<=' * int(
-            msg.data.split('&')[3] == 'ba'))
+    if len(db.read_table('Users_Database', 'id',msg.message.chat.id))!=0:
+        list_dict = Product(0,'').form_family_dict(family_name=db.read_table('Users_Database', 'id',msg.message.chat.id)[0][2])
+        if len(msg.data.split('&')) > 2:
+            ans = form_keyboard(list_dict, msg.data.split('&')[1], int(msg.data.split('&')[2]))
+            bot.answer_callback_query(msg.id, '=>' * int(msg.data.split('&')[3] == 'fo') + '<=' * int(
+                msg.data.split('&')[3] == 'ba'))
+        else:
+            ans = form_keyboard(list_dict, msg.data.split('&')[1])
+            bot.answer_callback_query(msg.id, msg.data.split('&')[1])
+        bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id, reply_markup=ans)
     else:
-        ans = form_keyboard(list_dict, msg.data.split('&')[1])
-        bot.answer_callback_query(msg.id, msg.data.split('&')[1])
-    bot.edit_message_reply_markup(message_id=msg.message.message_id, chat_id=msg.message.chat.id, reply_markup=ans)
+        bot.answer_callback_query(msg.id, 'Вы не авторизованы')
 
 
 @bot.callback_query_handler(func=lambda msg: 'p' in msg.data.split('&'))
@@ -325,30 +341,35 @@ def remove_product(msg):
         print(f'{msg.message.chat.id}(@{msg.message.chat.username}) - remove_product')
         print(msg.data)
         try:
-            print("remove product::deleted",db.read_table(family,'id',int(msg.data.split('&')[1])),'\n')
-            deleted=db.read_table(family,'Id',int(msg.data.split('&')[1]))[0]
+            print("remove product::deleted",db.read_table('Products_database','id',int(msg.data.split('&')[1])),'\n')
+            deleted=db.read_table('Products_database','Id',int(msg.data.split('&')[1]))[0]
+            if deleted[4]!=family:
+                bot.answer_callback_query(msg.id,'Отказано в доступе')
+                raise PermissionError
             deleted=Product(int(deleted[0]),deleted[2],deleted[1],bool(int(deleted[3])))
         except IndexError:
             deleted=None
-        if db.remove_record(family, column_name='Id', value=int(msg.data.split('&')[1])) and deleted is not None:
+        if db.remove_record('Products_database', column_name='Id', value=int(msg.data.split('&')[1])) and deleted is not None:
             try:
                 bot.answer_callback_query(msg.id, deleted.get_name() + ' успешно ' + morph.parse('вычеркнуто')[0].inflect(
                     {morph.parse(deleted.get_name().split(' ')[0])[0].tag.gender}).word + ' из списка')
             except ValueError:
                 bot.answer_callback_query(msg.id, deleted.get_name() + ' успешно вычеркнут(а) в список')
             dct = Product(0, '').form_family_dict(family)
-            print("remove product::dct", dct)
             text = Product(0, '').form_message_text(dct)
             kbd = form_keyboard(dct)
             bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=text,
                                   reply_markup=kbd)
             if deleted.is_urgent():
-                if msg.message.chat.username is not None:
-                    notify('del', msg.data.split('&')[1], family, msg.message.chat.username, msg.message.chat.id)
-                else:
-                    notify('del', msg.data.split('&')[1], family, msg.message.chat.first_name, msg.message.chat.id)
+                    notify('del', deleted, family,msg.message)
+
         else:
             bot.answer_callback_query(msg.id, f'{msg.data.split("&")[1]} удалить не удалось :(')
+            dct = Product(0, '').form_family_dict(family)
+            text = Product(0, '').form_message_text(dct)
+            kbd = form_keyboard(dct)
+            bot.edit_message_text(message_id=msg.message.message_id, chat_id=msg.message.chat.id, text=text,
+                                  reply_markup=kbd)
 
     else:
         bot.send_message(msg.message.chat.id, 'Вы не авторизованы')
@@ -551,19 +572,24 @@ def add_product(msg):
     if len(db.read_table('Users_database', column_name='id', value=msg.chat.id)) != 0:
         family = db.read_table('Users_database', column_name='id', value=msg.chat.id)[0][2]
         id=randint(10000, 99999)
-        while len(db.read_table(family,'Id',id))!=0:
+        while len(db.read_table('Products_database','Id',id))!=0:
             id = randint(00000, 99999)
         added = Product(id,msg.text)
         print(added)
-        add_ans = db.add_record(family, (id,added.get_category(),added.get_name(), int(added.is_urgent())))
+        add_ans = db.add_record('Products_database', (id,added.get_category(),added.get_name(), int(added.is_urgent()),family))
         if add_ans == 'Success':
             try:
-                bot.send_message(msg.chat.id, msg.text + ' успешно ' + morph.parse('добавлен')[0].inflect({morph.parse(msg.text.split(' ')[0])[0].tag.gender, 'pssv'}).word+' в список')
+                if morph.parse(added.get_name().split(' ')[0])[0].tag.number=='sing':
+                    gender=morph.parse(added.get_name().split(' ')[0])[0].tag.gender
+                else:
+                    gender = 'plur'
+                bot.send_message(msg.chat.id, added.get_name() + ' успешно ' + morph.parse('добавлен')[0].inflect({gender, 'pssv'}).word)
             except ValueError:
                 bot.send_message(msg.chat.id, msg.text + ' успешно добавлен(а) в список')
         else:
             bot.send_message(msg.chat.id, add_ans)
-
+        if added.is_urgent():
+            notify('add',added,family,msg)
     else:
         bot.send_message(msg.chat.id, 'Вы не авторизованы')
 

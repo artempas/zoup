@@ -12,23 +12,19 @@ class Product:
 
     def __init__(self, id: int, name: str, category=None, urgent=None):
         print(f"Product:__init__:\t id={id}, name={name}, category={category}, urgent={urgent}")
-        while '&' in name or '%' in name:
-            name.replace('%','проц.')
-            name.replace('&', ' and ')
-            name.replace('  ',' ')
         if urgent is None:
             if 'срочно' in name.lower():
                 self.__urgent = True
-                name.replace('срочно', '')
+                name=name.replace('срочно', '')
                 while "  " in name:
-                    name.replace('  ', ' ')
+                    name = name.replace('  ', ' ')
         else:
             self.__urgent = urgent
         self.__name = name
         self.__id = id
         if category is None:
             try:
-                name = ''.join(morph.parse(i)[0].normal_form if name.isalpha() else str(i) for i in name.split(' '))
+                name = ''.join(morph.parse(i)[0].normal_form if name.isalpha() else str(i)+' ' for i in name.split(' '))
             except ValueError:
                 name = self.__name
             found = False
@@ -52,7 +48,8 @@ class Product:
     def get_button(self):
         if self.__urgent:
             text = '✅❗️' + bool(len(self.__name) > 27) * (self.__name[:27] + '...') + bool(
-                len(self.__name) <= 27) * self.__name + '❗️',
+                len(self.__name) <= 27) * self.__name + '❗️'
+            print(text)
         else:
             text = '✅' + bool(len(self.__name) > 31) * (self.__name[:24] + '...') + bool(
                 len(self.__name) <= 31) * self.__name
@@ -60,7 +57,7 @@ class Product:
         return (text, reply_markup)
 
     def form_family_dict(self, family_name: str):
-        lst = db.read_table(family_name)
+        lst = db.read_table('Products_database','family',family_name)
         print(lst)
         if len(lst)==0:
             return {}
