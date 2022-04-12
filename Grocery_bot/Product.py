@@ -5,7 +5,8 @@ from pymorphy2 import MorphAnalyzer
 from mytoken import airtable_token, base_id
 import datetime
 
-
+RU_ALPHABET = {'ё', 'е', 'о', 'ь', 'п', 'м', 'ъ', 'ч', 'щ', 'ы', 'ц', 'х', 'р', 'ж', 'ф', 'в', 'с', 'ш', 'д', 'т', 'я',
+               'л', 'й', 'а', 'г', 'э', 'и', 'н', ' ', 'к', 'з', 'у','б','ю'}
 formatter = '[%(asctime)s] %(levelname)8s --- %(message)s (%(filename)s:%(lineno)s)'
 logging.basicConfig(
     filename=f'bot-from-{datetime.datetime.now().date()}.log',
@@ -40,13 +41,16 @@ class Product:
             self.__name = name
         self.id = id
         if category is None:
-            try:
-                name = ''.join(
-                    morph.parse(i)[0].normal_form if name.isalpha() else str(i) + ' ' for i in name.split(' '))
-            except ValueError as e:
-                logging.error(e)
-                name = self.__name
-            self.__category = db.category_product.first(formula="({product}=\"" + self.__name + '")')
+            name_cpy = ''.join(c for c in name.lower() if c in RU_ALPHABET)
+            name_inf = set()
+            for word in name_cpy.split(' '):
+                name_inf.add(morph.parse(word)[0].normal_form)
+            #print(name_inf)
+            for word in name_inf:
+                self.__category = db.category_product.first(formula="({product}=\"" + word + '")')
+                if self.__category is not None:
+                    break
+
             if self.__category is None:
                 self.__category = 'Другое'
                 try:
@@ -125,7 +129,8 @@ class Product:
                     cat_prod_dict[line['fields']['category']].append(Product(line['fields']['id'],
                                                                              line['fields']['product'],
                                                                              line['fields']['category'],
-                                                                             True if line['fields']['urgent'] == 'True' else False))
+                                                                             True if line['fields'][
+                                                                                         'urgent'] == 'True' else False))
         return cat_prod_dict
 
     def form_message_text(self, c_p_dict):

@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 edit = False
 admin_id = 354640082
-bot = TeleBot(mytoken.token, threaded=False)
+bot = TeleBot(mytoken.test, threaded=False)
 db = Database(mytoken.airtable_token, mytoken.base_id)
 authenticated = False
 waiting_notification = False
@@ -314,7 +314,7 @@ def show_products_in_category(msg):
     отображение продуктов в категории если продуктов больше 10-ти
     :param msg:
     """
-    family = db.users_database.first(formula="({id}=" + str(msg.chat.id) + ")")
+    family = db.users_database.first(formula="({id}=" + str(msg.message.chat.id) + ")")
     if family is not None:
         list_dict = Product(0, '').form_family_dict(
             family_name=family['fields']['family'])
@@ -407,10 +407,7 @@ def choose_category(msg):
     """
     logging.info(f'{msg.chat.id}(@{msg.chat.username}) - add_keyword(start)')
     keyboard = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
-    categories = []
-    for i in list(db.category_product.iterate())[0]:
-        if i['fields']['category'] not in categories:
-            categories.append(i['fields']['category'])
+    categories = set(i['fields']['category'] for i in db.category_product.all())
     for i in categories:
         keyboard.add(types.KeyboardButton(i))
     keyboard.add(types.KeyboardButton('Отмена'))
