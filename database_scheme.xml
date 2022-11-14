@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Active URL: https://ondras.zarovi.cz/sql/demo/?keyword=zoup -->
+<sql>
+<datatypes db="mysql">
+<group label="Numeric" color="rgb(238,238,170)">
+<type label="Integer" length="0" sql="INTEGER" quote=""/>
+<type label="TINYINT" length="0" sql="TINYINT" quote=""/>
+<type label="SMALLINT" length="0" sql="SMALLINT" quote=""/>
+<type label="MEDIUMINT" length="0" sql="MEDIUMINT" quote=""/>
+<type label="INT" length="0" sql="INT" quote=""/>
+<type label="BIGINT" length="0" sql="BIGINT" quote=""/>
+<type label="Decimal" length="1" sql="DECIMAL" re="DEC" quote=""/>
+<type label="Single precision" length="0" sql="FLOAT" quote=""/>
+<type label="Double precision" length="0" sql="DOUBLE" re="DOUBLE" quote=""/>
+</group>
+<group label="Character" color="rgb(255,200,200)">
+<type label="Char" length="1" sql="CHAR" quote="'"/>
+<type label="Varchar" length="1" sql="VARCHAR" quote="'"/>
+<type label="Text" length="0" sql="MEDIUMTEXT" re="TEXT" quote="'"/>
+<type label="Binary" length="1" sql="BINARY" quote="'"/>
+<type label="Varbinary" length="1" sql="VARBINARY" quote="'"/>
+<type label="BLOB" length="0" sql="BLOB" re="BLOB" quote="'"/>
+</group></datatypes><table x="760" y="302" name="Products">
+<row name="id" null="1" autoincrement="1">
+<datatype>INTEGER</datatype>
+<default>NULL</default></row>
+<row name="Name" null="0" autoincrement="0">
+<datatype>MEDIUMTEXT(255)</datatype>
+</row>
+<row name="Created_date" null="1" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>NULL</default></row>
+<row name="id_Person" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Person" row="id" />
+</row>
+<row name="id_Categories" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Categories" row="id" />
+</row>
+<row name="id_Family" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Family" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1076" y="484" name="Person">
+<row name="id" null="1" autoincrement="1">
+<datatype>INTEGER</datatype>
+<default>NULL</default></row>
+<row name="Name" null="1" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>NULL</default></row>
+<row name="Surname" null="1" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>NULL</default></row>
+<row name="chat_id" null="0" autoincrement="0">
+<datatype>INTEGER</datatype>
+</row>
+<row name="id_Family" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Family" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="387" y="394" name="Categories">
+<row name="id" null="1" autoincrement="1">
+<datatype>INTEGER</datatype>
+<default>NULL</default></row>
+<row name="Name" null="0" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="196" y="348" name="keywords">
+<row name="id" null="1" autoincrement="1">
+<datatype>INTEGER</datatype>
+<default>NULL</default></row>
+<row name="word" null="0" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>'NULL'</default></row>
+<row name="id_Categories" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Categories" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1385" y="416" name="Family">
+<row name="id" null="1" autoincrement="1">
+<datatype>INTEGER</datatype>
+<default>NULL</default></row>
+<row name="login" null="0" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>'NULL'</default></row>
+<row name="password" null="0" autoincrement="0">
+<datatype>CHAR</datatype>
+<default>'NULL'</default></row>
+<row name="created_by" null="1" autoincrement="0">
+<datatype>INTEGER</datatype>
+<default>NULL</default><relation table="Person" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+</sql>
