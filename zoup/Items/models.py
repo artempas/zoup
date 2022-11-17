@@ -1,8 +1,10 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import post_save
 
 
 # Create your models here.
+
 
 class Category(models.Model):
     name = models.CharField(max_length=70)
@@ -12,7 +14,9 @@ class Category(models.Model):
 
 
 class Keyword(models.Model):
-    category = models.ForeignKey(to=Category, on_delete=models.CASCADE)
+    category = models.ForeignKey(
+        to=Category, on_delete=models.CASCADE, related_name="get_keywords"
+    )
     keyword = models.CharField(max_length=50)
 
     def __str__(self):
@@ -20,26 +24,49 @@ class Keyword(models.Model):
 
 
 class Family(models.Model):
-    created_by = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True)
+    creator = models.ForeignKey(
+        to=User, on_delete=models.SET_NULL, null=True, related_name="creator"
+    )
     name = models.CharField(max_length=50)
+
     def __str__(self):
-        return f"{self.name} created by {self.created_by.name}"
+        return f"{self.name} created by {self.creator.username}"
 
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     chat_id = models.PositiveBigIntegerField()
-    family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True)
+    family = models.ForeignKey(
+        to=Family, on_delete=models.SET_NULL, null=True, related_name="get_members"
+    )
+
     def __str__(self):
         return f"{self.user} has {self.chat_id} belongs to {self.family.name}"
 
 
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.create(user=instance)
+
+
+post_save.connect(create_user_profile, sender=User)
+
+
 class Product(models.Model):
     name = models.CharField(max_length=255)
-    category = models.ForeignKey(to=Category, on_delete=models.SET_NULL, null=True)
-    created_date = models.DateTimeField()
-    created_by = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True)
-    family = models.ForeignKey(to=Family, on_delete=models.CASCADE)
+    category = models.ForeignKey(
+        to=Category, on_delete=models.SET_NULL, null=True, related_name="get_products"
+    )
+    created_date = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        to=User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="get_created_products",
+    )
+    family = models.ForeignKey(
+        to=Family, on_delete=models.CASCADE, related_name="get_products"
+    )
 
     def __str__(self):
-        return f'{self.name} ({self.category}) was created by {self.created_by} at {self.created_date} for {self.family}'
+        return f"{self.name} ({self.category}) was created by {self.created_by} at {self.created_date} for {self.family}"

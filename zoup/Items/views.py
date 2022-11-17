@@ -1,6 +1,22 @@
-from django.http import HttpResponse
-from django.shortcuts import render
+from django.contrib.auth import logout
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LogoutView
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
+from django.urls import reverse
 
-# Create your views here.
-def index(request):
-    return HttpResponse("Hello world!")
+from .models import *
+from django.views.generic import ListView
+
+
+class ItemList(LoginRequiredMixin, ListView):
+    login_url = "/admin"
+    model = Product
+    template_name = "index.html"
+
+    def get_queryset(self):
+        return self.model.objects.filter(family=self.request.user.profile.family)
+
+
+def login(request):
+    return HttpResponseRedirect(reverse("admin"))
