@@ -6,21 +6,21 @@ from Items.models import Product, Category, Family, Profile, Keyword
 
 # Register your models here.
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'created_by', 'family', 'created_date')
+    list_display = ("name", "category", "created_by", "family", "created_date")
 
 
 admin.site.register(Product, ProductAdmin)
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+    list_display = ("name",)
 
 
 admin.site.register(Category, CategoryAdmin)
 
 
 class FamilyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_by')
+    list_display = ("name", "creator")
 
 
 admin.site.register(Family, FamilyAdmin)
@@ -30,7 +30,7 @@ admin.site.register(Family, FamilyAdmin)
 class EmployeeInline(admin.StackedInline):
     model = Profile
     can_delete = False
-    verbose_name_plural = 'employee'
+    verbose_name_plural = "employee"
 
 
 # Define a new User admin
@@ -44,7 +44,7 @@ admin.site.register(User, UserAdmin)
 
 
 class KeywordAdmin(admin.ModelAdmin):
-    list_display = ('keyword', 'category')
+    list_display = ("keyword", "category")
 
 
 admin.site.register(Keyword, KeywordAdmin)
