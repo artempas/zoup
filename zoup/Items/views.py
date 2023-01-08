@@ -8,7 +8,7 @@ from django.urls import reverse, reverse_lazy
 
 from .forms import RegistrationForm, LoginUserForm
 from .models import *
-from django.views.generic import ListView, CreateView
+from django.views.generic import ListView, CreateView, DeleteView
 
 
 class ItemList(LoginRequiredMixin, ListView):
@@ -34,13 +34,10 @@ class RegisterUser(CreateView):
         login(self.request, user)
         return redirect("index")
 
+
 class LoginUser(LoginView):
     form_class = LoginUserForm
-    template_name = 'Items/login.html'
+    template_name = "Items/login.html"
 
     def get_success_url(self):
-        return reverse_lazy('index')
-
-class CreateProduct(CreateView):
-    form_class = CreateProductForm
-    template_name = 
+        return reverse_lazy("index")
