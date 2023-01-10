@@ -47,7 +47,7 @@ class Family(models.Model):
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     chat_id = models.PositiveBigIntegerField(null=True)
-    family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, related_name="get_members")
+    family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="get_members")
 
     def __str__(self):
         return f"Profile of user {self.user}"

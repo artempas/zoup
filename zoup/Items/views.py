@@ -8,7 +8,7 @@ from django.urls import reverse, reverse_lazy
 
 from .forms import RegistrationForm, LoginUserForm
 from .models import *
-from django.views.generic import ListView, CreateView, DeleteView
+from django.views.generic import ListView, CreateView, DeleteView, UpdateView
 
 
 class ItemList(LoginRequiredMixin, ListView):
@@ -17,7 +17,17 @@ class ItemList(LoginRequiredMixin, ListView):
     template_name = "index.html"
 
     def get_queryset(self):
-        return self.model.objects.filter(family=self.request.user.profile.family)
+        try:
+            return self.model.objects.filter(family=self.request.user.profile.family)
+        except Profile.DoesNotExist:
+            self.request.user.profile=Profile()
+            self.request.user.profile.save()
+            self.request.user.save()
+            return self.model.objects.filter(family=self.request.user.profile.family)
+    def get_context_data(self, **kwargs):
+        context = super(ItemList, self).get_context_data(**kwargs)
+        context['user'] = self.request.user
+        return context
 
 
 def login_user(request):
@@ -41,3 +51,7 @@ class LoginUser(LoginView):
 
     def get_success_url(self):
         return reverse_lazy("index")
+
+
+class ProfileView(UpdateView):
+    pass
