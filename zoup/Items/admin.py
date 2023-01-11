@@ -20,7 +20,10 @@ admin.site.register(Category, CategoryAdmin)
 
 
 class FamilyAdmin(admin.ModelAdmin):
-    list_display = ("name", "creator")
+    list_display = ("name", "creator", "members")
+
+    def members(self, obj: Family):
+        return obj.members.count()
 
 
 admin.site.register(Family, FamilyAdmin)

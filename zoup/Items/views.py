@@ -20,13 +20,14 @@ class ItemList(LoginRequiredMixin, ListView):
         try:
             return self.model.objects.filter(family=self.request.user.profile.family)
         except Profile.DoesNotExist:
-            self.request.user.profile=Profile()
+            self.request.user.profile = Profile()
             self.request.user.profile.save()
             self.request.user.save()
             return self.model.objects.filter(family=self.request.user.profile.family)
+
     def get_context_data(self, **kwargs):
         context = super(ItemList, self).get_context_data(**kwargs)
-        context['user'] = self.request.user
+        context["user"] = self.request.user
         return context
 
 

@@ -15,47 +15,90 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Category',
+            name="Category",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=70, unique=True)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("name", models.CharField(max_length=70, unique=True)),
             ],
         ),
         migrations.CreateModel(
-            name='Family',
+            name="Family",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=50)),
-                ('creator', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='creator', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("name", models.CharField(max_length=50)),
+                (
+                    "creator",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="creator",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Profile',
+            name="Profile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('chat_id', models.PositiveBigIntegerField(null=True)),
-                ('family', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='get_members', to='Items.family')),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("chat_id", models.PositiveBigIntegerField(null=True)),
+                (
+                    "family",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="get_members",
+                        to="Items.family",
+                    ),
+                ),
+                ("user", models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),
         migrations.CreateModel(
-            name='Product',
+            name="Product",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
-                ('created_date', models.DateTimeField(auto_now_add=True)),
-                ('to_notify', models.BooleanField(default=False)),
-                ('category', models.ForeignKey(default='Другое', on_delete=django.db.models.deletion.SET_DEFAULT, related_name='get_products', to='Items.category', to_field='name')),
-                ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='get_created_products', to=settings.AUTH_USER_MODEL)),
-                ('family', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='get_products', to='Items.family')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("name", models.CharField(max_length=255)),
+                ("created_date", models.DateTimeField(auto_now_add=True)),
+                ("to_notify", models.BooleanField(default=False)),
+                (
+                    "category",
+                    models.ForeignKey(
+                        default="Другое",
+                        on_delete=django.db.models.deletion.SET_DEFAULT,
+                        related_name="get_products",
+                        to="Items.category",
+                        to_field="name",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="get_created_products",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "family",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, related_name="get_products", to="Items.family"
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Keyword',
+            name="Keyword",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('keyword', models.CharField(max_length=50)),
-                ('category', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='get_keywords', to='Items.category')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("keyword", models.CharField(max_length=50)),
+                (
+                    "category",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, related_name="get_keywords", to="Items.category"
+                    ),
+                ),
             ],
         ),
     ]

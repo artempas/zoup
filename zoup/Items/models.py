@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete, pre_save
 
 
 # Create your models here.
@@ -14,7 +14,7 @@ class Category(models.Model):
 
 
 class Keyword(models.Model):
-    category = models.ForeignKey(to=Category, on_delete=models.CASCADE, related_name="get_keywords")
+    category = models.ForeignKey(to=Category, on_delete=models.CASCADE, related_name="keywords")
     keyword = models.CharField(max_length=50)
 
     def __repr__(self):
@@ -37,17 +37,32 @@ class Family(models.Model):
     def __str__(self):
         return self.name
 
-    def delete_if_no_members_left(self):
-        pass  # todo
-
-    def get_members(self):
-        pass  # todo
-
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     chat_id = models.PositiveBigIntegerField(null=True)
-    family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="get_members")
+    _family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="members")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__old_family = None
+
+    @property
+    def family(self):
+        return self._family
+
+    @family.setter
+    def family(self, value: Family):
+        if self.__old_family is None:
+            self.__old_family = self._family
+        self._family = value
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.__old_family:
+            if not Profile.objects.filter(_family=self.__old_family).count():
+                self.__old_family.delete()
+        self.__old_family = None
 
     def __str__(self):
         return f"Profile of user {self.user}"
@@ -57,6 +72,15 @@ class Profile(models.Model):
             return f"{self.user} has {self.chat_id} belongs to {self.family.name}"
         else:
             return f"{self.user} has {self.chat_id} doesn't belong to any family"
+
+
+def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
+    if not Profile.objects.filter(family=instance.family).count():
+        instance.family.delete()
+
+
+post_delete.connect(delete_if_no_members_left, Profile)
+# pre_save.connect(delete_if_no_members_left,Profile)
 
 
 def create_user_profile(sender, instance, created, **kwargs):
