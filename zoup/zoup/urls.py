@@ -19,6 +19,5 @@ from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("items/", include("Items.urls")),
-    path("", lambda request: redirect("/items/")),
+    path("", include("Items.urls")),
 ]

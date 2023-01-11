@@ -1,5 +1,5 @@
 from django.contrib.auth.views import LogoutView
-from django.urls import path
+from django.urls import path, include
 
 from . import views
 
@@ -10,4 +10,5 @@ urlpatterns = [
     path("register", views.RegisterUser.as_view(), name="register"),
     path("check_item", views.RegisterUser.as_view(), name="register"),
     path("profile", views.ProfileView.as_view(), name="profile"),
+    path("api/", include('Items.api.urls'))
 ]

@@ -80,7 +80,6 @@ def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
 
 
 post_delete.connect(delete_if_no_members_left, Profile)
-# pre_save.connect(delete_if_no_members_left,Profile)
 
 
 def create_user_profile(sender, instance, created, **kwargs):
