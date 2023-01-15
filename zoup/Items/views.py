@@ -1,18 +1,18 @@
 from django.contrib.auth import logout, login
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LogoutView, LoginView
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 
-from .forms import RegistrationForm, LoginUserForm
+from .forms import RegistrationForm, LoginUserForm, ChangeUsernameForm
 from .models import *
-from django.views.generic import ListView, CreateView, DeleteView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView
 
 
 class ItemList(LoginRequiredMixin, ListView):
-    login_url = "/admin"
+    login_url = reverse_lazy("login")
     model = Product
     template_name = "index.html"
 
@@ -51,8 +51,31 @@ class LoginUser(LoginView):
     template_name = "Items/login.html"
 
     def get_success_url(self):
-        return reverse_lazy("index")
+        return reverse_lazy("profile")
 
 
-class ProfileView(UpdateView):
+class ProfileView(LoginRequiredMixin, UpdateView):
+    model = User
+    login_url = reverse_lazy("login")
+    template_name = "Items/profile.html"
+    form_class = ChangeUsernameForm
+    success_url = reverse_lazy("profile")
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["user"] = self.request.user
+        if self.request.user.profile.family:
+            if self.request.user.profile.family.creator == self.request.user:
+                context["invite_url"] = self.request.user.profile.family.create_invite_url()
+        return context
+
+
+class CreateFamily(CreateView):
+    pass
+
+
+def leave_family(request):
     pass

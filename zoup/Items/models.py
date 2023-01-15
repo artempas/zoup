@@ -28,6 +28,9 @@ class Family(models.Model):
     creator = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True, related_name="creator")
     name = models.CharField(max_length=50)
 
+    def create_invite_url(self) -> str:
+        return "Invite link"  # TODO
+
     def __repr__(self):
         if self.creator.username:
             return f"{self.name} created by {self.creator.username}"
@@ -40,7 +43,8 @@ class Family(models.Model):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    chat_id = models.PositiveBigIntegerField(null=True)
+    chat_id = models.PositiveBigIntegerField(blank=True, null=True)
+    telegram_name = models.CharField(blank=True, max_length=255, null=True)
     _family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="members")
 
     def __init__(self, *args, **kwargs):
