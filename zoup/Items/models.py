@@ -1,6 +1,11 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models.signals import post_save, post_delete, pre_save
+from django.http import Http404
+from django.db.models.signals import post_save, post_delete
+from django.shortcuts import get_object_or_404
+from jwt import encode, decode
+from jwt.exceptions import InvalidTokenError
+from os import environ
 
 
 # Create your models here.
@@ -28,8 +33,20 @@ class Family(models.Model):
     creator = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True, related_name="creator")
     name = models.CharField(max_length=50)
 
-    def create_invite_url(self) -> str:
-        return "Invite link"  # TODO
+    def create_invite_token(self) -> str:
+        return encode({"id":self.id,"name":self.name,"creator_id":self.creator_id},algorithm="HS256", key=environ["settings_token"])
+
+    @staticmethod
+    def get_family_by_token(token:str) -> "Family":
+        try:
+            params=decode(token, environ["settings_token"], algorithms="HS256")
+        except InvalidTokenError:
+            raise PermissionError("Token is invalid")
+        return get_object_or_404(Family,**params)
+
+
+
+
 
     def __repr__(self):
         if self.creator.username:
@@ -78,6 +95,7 @@ class Profile(models.Model):
             return f"{self.user} has {self.chat_id} doesn't belong to any family"
 
 
+# noinspection PyUnusedLocal
 def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
     if not Profile.objects.filter(family=instance.family).count():
         instance.family.delete()
@@ -87,6 +105,7 @@ post_delete.connect(delete_if_no_members_left, Profile)
 # pre_save.connect(delete_if_no_members_left,Profile)
 
 
+# noinspection PyUnusedLocal
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)

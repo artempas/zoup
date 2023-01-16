@@ -1,5 +1,20 @@
 {% extends 'base.html' %}
 {% block content %}
+<script>function copyToClipboard(element) {
+  // Get the text field
+  var copyText = document.getElementById(element);
+
+  // Select the text field
+  copyText.select();
+  copyText.setSelectionRange(0, 99999); // For mobile devices
+
+   // Copy the text inside the text field
+  navigator.clipboard.writeText(copyText.value);
+
+  // Alert the copied text
+  alert("Copied the text: " + copyText.value);
+}
+</script>
 <div class="row my-3 p-3">
     </div>
     {% if form.errors %}
@@ -52,7 +67,7 @@
         {{ user.profile.family.name }}
         <a type="button" class="btn btn-dark" href="{% url 'leave_family' %}">Покинуть семью</a>
         {% if user.profile.family.creator == user %}
-            <br> Ссылка для приглашения: {{ invite_url }}
+            <br> Ссылка для приглашения: <p id="invite_url">{{ invite_url }}</p> <button class="btn btn-light" onclick="copyToClipboard('#invite_url')">Скопировать</button>
         {% endif %}
     {% else %}
         <a type="button" class="btn btn-dark" href= "{% url 'create_family' %}">Создать семью</a>
