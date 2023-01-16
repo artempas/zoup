@@ -6,10 +6,10 @@ from django.contrib.auth.views import LogoutView, LoginView
 from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
-from urllib.parse import  quote_plus
+from urllib.parse import quote_plus
 from .forms import RegistrationForm, LoginUserForm, ChangeUsernameForm
 from .models import *
-from django.views.generic import ListView, CreateView, UpdateView,TemplateView
+from django.views.generic import ListView, CreateView, UpdateView, TemplateView
 
 
 class ItemList(LoginRequiredMixin, ListView):
@@ -49,7 +49,6 @@ class LoginUser(LoginView):
     template_name = "Items/login.html"
 
 
-
 class ProfileView(LoginRequiredMixin, UpdateView):
     model = User
     login_url = reverse_lazy("login")
@@ -65,7 +64,11 @@ class ProfileView(LoginRequiredMixin, UpdateView):
         context["user"] = self.request.user
         if self.request.user.profile.family:
             if self.request.user.profile.family.creator == self.request.user:
-                context["invite_url"] = self.request.build_absolute_uri(reverse_lazy('invite'))+"?token="+quote_plus(self.request.user.profile.family.create_invite_token())
+                context["invite_url"] = (
+                    self.request.build_absolute_uri(reverse_lazy("invite"))
+                    + "?token="
+                    + quote_plus(self.request.user.profile.family.create_invite_token())
+                )
         return context
 
 
@@ -95,31 +98,31 @@ def leave_family(request: HttpRequest):
         request.user.profile.save()
     return HttpResponseRedirect(reverse_lazy("profile"))
 
+
 class InviteLink(LoginRequiredMixin, TemplateView):
     template_name = "Items/invite.html"
-    def get(self,request:HttpRequest, *args,**kwargs):
+
+    def get(self, request: HttpRequest, *args, **kwargs):
         if "token" not in request.GET:
             return HttpResponse("No token provided", status=403)
         try:
-            self.extra_context= {'family': Family.get_family_by_token(request.GET.get('token', default=None)), "user":request.user}
+            self.extra_context = {
+                "family": Family.get_family_by_token(request.GET.get("token", default=None)),
+                "user": request.user,
+            }
         except PermissionError:
             return HttpResponse("Your invite link must be corrupted", status=403)
-        return super().get(request,*args,**kwargs)
+        return super().get(request, *args, **kwargs)
+
     def post(self, request):
         if "token" not in request.GET:
             return HttpResponse("No token provided", status=403)
         try:
-            family=Family.get_family_by_token(request.GET.get('token', default=None))
-            if int(self.request.POST.get('id'))!=family.id:
+            family = Family.get_family_by_token(request.GET.get("token", default=None))
+            if int(self.request.POST.get("id")) != family.id:
                 return HttpResponse("Form is invalid", status=403)
-            request.user.profile.family=family
+            request.user.profile.family = family
             request.user.profile.save()
         except PermissionError:
             return HttpResponse("Your invite link must be corrupted", status=403)
         return HttpResponseRedirect(reverse_lazy("profile"))
-
-
-
-
-
-
