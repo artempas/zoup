@@ -13,5 +13,5 @@ urlpatterns = [
     path("create_family", views.CreateFamily.as_view(), name="create_family"),
     path("leave_family", views.leave_family, name="leave_family"),
     path("reset_password", PasswordChangeView.as_view(template_name="Items/change_password.html"), name="reset_password"),
-    path("invite/", views.InviteLink.as_view(), name='invite')
+    path("invite/", views.InviteLink.as_view(), name="invite"),
 ]

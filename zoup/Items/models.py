@@ -34,19 +34,19 @@ class Family(models.Model):
     name = models.CharField(max_length=50)
 
     def create_invite_token(self) -> str:
-        return encode({"id":self.id,"name":self.name,"creator_id":self.creator_id},algorithm="HS256", key=environ["settings_token"])
+        return encode(
+            {"id": self.id, "name": self.name, "creator_id": self.creator_id},
+            algorithm="HS256",
+            key=environ["settings_token"],
+        )
 
     @staticmethod
-    def get_family_by_token(token:str) -> "Family":
+    def get_family_by_token(token: str) -> "Family":
         try:
-            params=decode(token, environ["settings_token"], algorithms="HS256")
+            params = decode(token, environ["settings_token"], algorithms="HS256")
         except InvalidTokenError:
             raise PermissionError("Token is invalid")
-        return get_object_or_404(Family,**params)
-
-
-
-
+        return get_object_or_404(Family, **params)
 
     def __repr__(self):
         if self.creator.username:
