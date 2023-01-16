@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+<script>function copyToClipboard(element) {
+  // Get the text field
+  var copyText = document.getElementById(element);
+
+  // Select the text field
+  copyText.select();
+  copyText.setSelectionRange(0, 99999); // For mobile devices
+
+   // Copy the text inside the text field
+  navigator.clipboard.writeText(copyText.value);
+
+  // Alert the copied text
+  alert("Copied the text: " + copyText.value);
+}
+</script>
+<div class="row my-3 p-3">
+    </div>
+    {% if form.errors %}
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            <div id="form_errors">
+                {% for key, value in form.errors.items %}
+                    <strong>{{ value }}</strong>
+                {% endfor %}
+            </div>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    {% endif %}
+    <div class="form-content">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="col-md-5">
+                    <div class="form-group">
+                        <label class="small mb-1">Username:</label>
+                            {{ form.username  }}
+                    </div>
+{#                    <div class="form-group">#}
+{#                        <a href="#">Change Password</a>#}
+{#                        <hr>#}
+{#                        <label class="small mb-1">Change Avatar:</label>#}
+{#                        {{ profile_form.avatar }}#}
+{#                    </div>#}
+{#                    <label class="small mb-1">Bio:</label> {{ profile_form.bio }}#}
+                </div>
+            </div>
+            <br><br>
+            <button type="submit" class="btn btn-dark btn-lg">Save Changes</button>
+            <a type="reset" class="btn btn-dark btn-lg" href="{% url 'reset_password' %}">Reset Password</a>
+        </form>
+    <strong>Telegram: </strong>
+    {% if not user.profile.chat_id %}
+    Не привязан
+    {% else %}
+        {% if user.profile.telegram_name %}
+        <a href="https://t.me/{{ user.profile.telegram_name }}">{{ user.profile.telegram_name }}</a> ({{ user.profile.chat_id }})
+        {% else %}
+        {{ user.profile.telegram_name }}
+        {% endif %}
+    {% endif %}
+    </div>
+    <strong>Семья:</strong><br>
+    {% if user.profile.family %}
+        {{ user.profile.family.name }}
+        <a type="button" class="btn btn-dark" href="{% url 'leave_family' %}">Покинуть семью</a>
+        {% if user.profile.family.creator == user %}
+            <br> Ссылка для приглашения: <p id="invite_url">{{ invite_url }}</p> <button class="btn btn-light" onclick="copyToClipboard('#invite_url')">Скопировать</button>
+        {% endif %}
+    {% else %}
+        <a type="button" class="btn btn-dark" href= "{% url 'create_family' %}">Создать семью</a>
+    {% endif %}
+
+{% endblock content %}

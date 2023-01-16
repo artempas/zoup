@@ -1,6 +1,11 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models.signals import post_save, post_delete, pre_save
+from django.http import Http404
+from django.db.models.signals import post_save, post_delete
+from django.shortcuts import get_object_or_404
+from jwt import encode, decode
+from jwt.exceptions import InvalidTokenError
+from os import environ
 
 
 # Create your models here.
@@ -28,6 +33,21 @@ class Family(models.Model):
     creator = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True, related_name="creator")
     name = models.CharField(max_length=50)
 
+    def create_invite_token(self) -> str:
+        return encode({"id":self.id,"name":self.name,"creator_id":self.creator_id},algorithm="HS256", key=environ["settings_token"])
+
+    @staticmethod
+    def get_family_by_token(token:str) -> "Family":
+        try:
+            params=decode(token, environ["settings_token"], algorithms="HS256")
+        except InvalidTokenError:
+            raise PermissionError("Token is invalid")
+        return get_object_or_404(Family,**params)
+
+
+
+
+
     def __repr__(self):
         if self.creator.username:
             return f"{self.name} created by {self.creator.username}"
@@ -40,7 +60,8 @@ class Family(models.Model):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    chat_id = models.PositiveBigIntegerField(null=True)
+    chat_id = models.PositiveBigIntegerField(blank=True, null=True)
+    telegram_name = models.CharField(blank=True, max_length=255, null=True)
     _family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="members")
 
     def __init__(self, *args, **kwargs):
@@ -74,6 +95,7 @@ class Profile(models.Model):
             return f"{self.user} has {self.chat_id} doesn't belong to any family"
 
 
+# noinspection PyUnusedLocal
 def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
     if not Profile.objects.filter(family=instance.family).count():
         instance.family.delete()
@@ -82,6 +104,7 @@ def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
 post_delete.connect(delete_if_no_members_left, Profile)
 
 
+# noinspection PyUnusedLocal
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)

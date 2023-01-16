@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+    {{ family.creator.username }} Приглашает вас в семью {{ family.name }}
+    <form method="post">
+            {% csrf_token %}
+    <input type="hidden" name="id" value="{{ family.id }}" />
+    <button type="submit" class="btn btn-success">Принять</button>
+    <a class="btn btn-outline-warning" href="{% url 'index' %}">Отказаться</a>
+    </form>
+    {% if user.profile.family %}
+    <p class="alert-warning">При этом вы покинете семью {{ user.profile.family.name }}</p>
+    {% endif %}
+{% endblock %}
