@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && \
     apt-get install -yq tzdata && \
     dpkg-reconfigure -f noninteractive tzdata
-WORKDIR /Bot
-COPY ./requirements.txt /Bot/
+WORKDIR /Grocery_bot
+COPY . /Grocery_bot/
 RUN pip install -r requirements.txt
-COPY . /Bot/
+ENV PYTHONPATH /Grocery_bot

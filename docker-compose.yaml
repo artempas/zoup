@@ -32,7 +32,7 @@ services:
     expose:
       - 8000
     volumes:
-      - ./zoup/Items/static:/home/app/web/static
+      - /root/zoup/zoup/Items/static:/home/app/web/static
     environment:
       - DJANGO_SETTINGS_MODULE=zoup.settings
       - docker=1
@@ -43,7 +43,7 @@ services:
     working_dir: /Grocery_bot
     command: python main.py
     volumes:
-      - ./Grocery_bot:/Grocery_bot
+      - /root/zoup/Grocery_bot:/Grocery_bot
     depends_on:
       - django_gunicorn
 
@@ -53,7 +53,7 @@ services:
     build:
       ./nginx
     volumes:
-      - ./zoup/Items/static:/home/app/web/static
+      - /root/zoup/zoup/Items/static:/home/app/web/static
     ports:
       - "80:80"
     depends_on:
