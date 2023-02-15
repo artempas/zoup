@@ -25,27 +25,40 @@ services:
         PGADMIN_DEFAULT_EMAIL: admin@admin.com
         PGADMIN_DEFAULT_PASSWORD: admin
       restart: always
+  django_gunicorn:
+    working_dir: /zoup
+    build: ./zoup
+    command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
+    expose:
+      - 8000
+    volumes:
+      - ./zoup/Items/static:/home/app/web/static
+    environment:
+      - DJANGO_SETTINGS_MODULE=zoup.settings
+      - docker=1
+    depends_on:
+      - redis
+  bot:
+    build: ./Grocery_bot
+    working_dir: /Grocery_bot
+    command: python main.py
+    volumes:
+      - ./Grocery_bot:/Grocery_bot
+    depends_on:
+      - django_gunicorn
+
+  redis:
+    image: redis:7.0
+  nginx:
+    build:
+      ./nginx
+    volumes:
+      - ./zoup/Items/static:/home/app/web/static
+    ports:
+      - "80:80"
+    depends_on:
+      - django_gunicorn
 volumes:
+  static:
+  media:
   postgres_data:
-#services:
-#  db:
-#    image: postgres
-#    volumes:
-#      - ./data/db:/var/lib/postgresql/data
-#    environment:
-#      - POSTGRES_DB=postgres
-#      - POSTGRES_USER=postgres
-#      - POSTGRES_PASSWORD=postgres
-#  web:
-#    build: .
-#    command: python manage.py runserver 0.0.0.0:8000
-#    volumes:
-#      - .:/code
-#    ports:
-#      - "8000:8000"
-#    environment:
-#      - POSTGRES_NAME=postgres
-#      - POSTGRES_USER=postgres
-#      - POSTGRES_PASSWORD=postgres
-#    depends_on:
-#      - db
