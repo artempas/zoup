@@ -6,28 +6,7 @@ import mytoken
 from database_module import Database
 from Product import Product, morph
 import datetime
-import fastapi
-import uvicorn
 
-
-
-WEBHOOK_HOST = '46.151.24.37'
-WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
-WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
-
-WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Path to the ssl certificate
-WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Path to the ssl private key
-
-# Quick'n'dirty SSL certificate generation:
-#
-# openssl genrsa -out webhook_pkey.pem 2048
-# openssl req -new -x509 -days 3650 -key webhook_pkey.pem -out webhook_cert.pem
-#
-# When asked for "Common Name (e.g. server FQDN or YOUR name)" you should reply
-# with the same value in you put in WEBHOOK_HOST
-
-WEBHOOK_URL_BASE = "https://{}:{}".format(WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/{}/".format(mytoken.teletoken)
 
 formatter = '[%(asctime)s] %(levelname)8s --- %(message)s (%(filename)s:%(lineno)s)'
 logging.basicConfig(
@@ -43,18 +22,8 @@ bot = TeleBot(mytoken.teletoken, threaded=False)
 db = Database(mytoken.airtable_token, mytoken.base_id)
 authenticated = False
 waiting_notification = False
-app = fastapi.FastAPI(docs=None, redoc_url=None)
 
-@app.post(f'/{mytoken.teletoken}/')
-def process_webhook(update: dict):
-    """
-    Process webhook calls
-    """
-    if update:
-        update = telebot.types.Update.de_json(update)
-        bot.process_new_updates([update])
-    else:
-        return
+
 def form_keyboard(cat_prod_dict, category=None, page=1):
     logging.info(f"form_keyboard:input: {cat_prod_dict=}\t{category =}\t{page=}")
     ans = types.InlineKeyboardMarkup(row_width=2)
@@ -643,19 +612,9 @@ def add_product(msg):
 bot.enable_save_next_step_handlers(15)
 bot.load_next_step_handlers()
 
-bot.remove_webhook()
-
-# Set webhook
-bot.set_webhook(
-    url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-    certificate=open(WEBHOOK_SSL_CERT, 'r')
-)
-
-
-uvicorn.run(
-    app,
-    host=WEBHOOK_LISTEN,
-    port=WEBHOOK_PORT,
-    ssl_certfile=WEBHOOK_SSL_CERT,
-    ssl_keyfile=WEBHOOK_SSL_PRIV
-)
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        time.sleep(10)
