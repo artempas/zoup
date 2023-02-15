@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 edit = False
 admin_id = 354640082
-bot = TeleBot(mytoken.test, threaded=False)
+bot = TeleBot(mytoken.teletoken, threaded=False)
 db = Database(mytoken.airtable_token, mytoken.base_id)
 authenticated = False
 waiting_notification = False

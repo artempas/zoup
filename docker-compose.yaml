@@ -44,8 +44,8 @@ services:
     command: python main.py
     volumes:
       - /root/zoup/Grocery_bot:/Grocery_bot
-    depends_on:
-      - django_gunicorn
+#   depends_on:
+#      - django_gunicorn
 
   redis:
     image: redis:7.0
