@@ -5,15 +5,49 @@ from pymorphy2 import MorphAnalyzer
 from mytoken import airtable_token, base_id
 import datetime
 
-RU_ALPHABET = {'ё', 'е', 'о', 'ь', 'п', 'м', 'ъ', 'ч', 'щ', 'ы', 'ц', 'х', 'р', 'ж', 'ф', 'в', 'с', 'ш', 'д', 'т', 'я',
-               'л', 'й', 'а', 'г', 'э', 'и', 'н', ' ', 'к', 'з', 'у','б','ю'}
-formatter = '[%(asctime)s] %(levelname)8s --- %(message)s (%(filename)s:%(lineno)s)'
+RU_ALPHABET = {
+    "ё",
+    "е",
+    "о",
+    "ь",
+    "п",
+    "м",
+    "ъ",
+    "ч",
+    "щ",
+    "ы",
+    "ц",
+    "х",
+    "р",
+    "ж",
+    "ф",
+    "в",
+    "с",
+    "ш",
+    "д",
+    "т",
+    "я",
+    "л",
+    "й",
+    "а",
+    "г",
+    "э",
+    "и",
+    "н",
+    " ",
+    "к",
+    "з",
+    "у",
+    "б",
+    "ю",
+}
+formatter = "[%(asctime)s] %(levelname)8s --- %(message)s (%(filename)s:%(lineno)s)"
 logging.basicConfig(
-    filename=f'bot-from-{datetime.datetime.now().date()}.log',
-    filemode='w',
+    filename=f"bot-from-{datetime.datetime.now().date()}.log",
+    filemode="w",
     format=formatter,
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.WARNING
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.WARNING,
 )
 
 morph = MorphAnalyzer()
@@ -29,11 +63,11 @@ class Product:
     def __init__(self, id: int, name: str, category=None, urgent=None):
         # print(f"Product:__init__:\t id={id}, name={name}, category={category}, urgent={urgent}")
         if urgent is None:
-            if 'срочно' in name.lower():
+            if "срочно" in name.lower():
                 self.__urgent = True
-                self.__name = name.lower().replace('срочно', '').capitalize()
+                self.__name = name.lower().replace("срочно", "").capitalize()
                 while "  " in self.__name:
-                    self.__name = self.__name.replace('  ', ' ')
+                    self.__name = self.__name.replace("  ", " ")
             else:
                 self.__name = name
         else:
@@ -41,24 +75,24 @@ class Product:
             self.__name = name
         self.id = id
         if category is None:
-            name_cpy = ''.join(c for c in name.lower() if c in RU_ALPHABET)
+            name_cpy = "".join(c for c in name.lower() if c in RU_ALPHABET)
             name_inf = set()
-            for word in name_cpy.split(' '):
+            for word in name_cpy.split(" "):
                 name_inf.add(morph.parse(word)[0].normal_form)
-            #print(name_inf)
+            # print(name_inf)
             for word in name_inf:
-                self.__category = db.category_product.first(formula="({product}=\"" + word + '")')
+                self.__category = db.category_product.first(formula='({product}="' + word + '")')
                 if self.__category is not None:
                     break
 
             if self.__category is None:
-                self.__category = 'Другое'
+                self.__category = "Другое"
                 try:
-                    db.other.create({'name': self.__name})
+                    db.other.create({"name": self.__name})
                 except Exception:
                     pass
             else:
-                self.__category = self.__category['fields']['category']
+                self.__category = self.__category["fields"]["category"]
 
         else:
             self.__category = category
@@ -98,13 +132,20 @@ class Product:
 
     def get_button(self):
         if self.__urgent:
-            text = '✅❗️' + bool(len(self.__name) > 27) * (self.__name[:27] + '...') + bool(
-                len(self.__name) <= 27) * self.__name + '❗️'
+            text = (
+                "✅❗️"
+                + bool(len(self.__name) > 27) * (self.__name[:27] + "...")
+                + bool(len(self.__name) <= 27) * self.__name
+                + "❗️"
+            )
             # print(text)
         else:
-            text = '✅' + bool(len(self.__name) > 31) * (self.__name[:24] + '...') + bool(
-                len(self.__name) <= 31) * self.__name
-        reply_markup = f'p&{self.id}'
+            text = (
+                "✅"
+                + bool(len(self.__name) > 31) * (self.__name[:24] + "...")
+                + bool(len(self.__name) <= 31) * self.__name
+            )
+        reply_markup = f"p&{self.id}"
         return (text, reply_markup)
 
     def form_family_dict(self, family_name: str):
@@ -115,39 +156,44 @@ class Product:
         cat_prod_dict = {}
         categories = []
         for line in lst:
-            if line['fields']['category'] not in categories:
-                categories.append(line['fields']['category'])
+            if line["fields"]["category"] not in categories:
+                categories.append(line["fields"]["category"])
         categories.sort()
-        if 'Другое' in categories:
-            if categories.index('Другое') != len(categories) - 1:
-                categories[categories.index('Другое')], categories[-1] = categories[-1], categories[
-                    categories.index('Другое')]
+        if "Другое" in categories:
+            if categories.index("Другое") != len(categories) - 1:
+                categories[categories.index("Другое")], categories[-1] = (
+                    categories[-1],
+                    categories[categories.index("Другое")],
+                )
         for category in categories:
             cat_prod_dict[category] = []
             for line in lst:
-                if line['fields']['category'] == category:
-                    cat_prod_dict[line['fields']['category']].append(Product(line['fields']['id'],
-                                                                             line['fields']['product'],
-                                                                             line['fields']['category'],
-                                                                             True if line['fields'][
-                                                                                         'urgent'] == 'True' else False))
+                if line["fields"]["category"] == category:
+                    cat_prod_dict[line["fields"]["category"]].append(
+                        Product(
+                            line["fields"]["id"],
+                            line["fields"]["product"],
+                            line["fields"]["category"],
+                            True if line["fields"]["urgent"] == "True" else False,
+                        )
+                    )
         return cat_prod_dict
 
     def form_message_text(self, c_p_dict):
         # print('got 2 f_m_t')
         if len(c_p_dict) != 0:
-            message = 'Список покупок:\n\n'
+            message = "Список покупок:\n\n"
             for category in c_p_dict.keys():
                 cnt = 1
-                message += category + ':\n'
+                message += category + ":\n"
                 for product in c_p_dict[category]:
                     try:
-                        message += str(cnt) + ') ' + product.__name + '\n'
+                        message += str(cnt) + ") " + product.__name + "\n"
                     except TypeError:
                         pass
                     cnt += 1
         else:
-            message = 'Список пуст'
+            message = "Список пуст"
         return message
 
     def is_urgent(self) -> bool:

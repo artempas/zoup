@@ -2,6 +2,7 @@ from django.urls import path, include
 from django.contrib.auth.views import LogoutView, PasswordChangeView
 from django.urls import path
 from . import views
+
 urlpatterns = [
     path("", views.ItemList.as_view(), name="index"),
     path("logout", LogoutView.as_view(next_page="login"), name="logout"),
@@ -11,11 +12,9 @@ urlpatterns = [
     path("profile", views.ProfileView.as_view(), name="profile"),
     path("create_family", views.CreateFamily.as_view(), name="create_family"),
     path("leave_family", views.leave_family, name="leave_family"),
-    path("reset_password", PasswordChangeView.as_view(template_name="Items/change_password.html"), name="reset_password"),
+    path(
+        "reset_password", PasswordChangeView.as_view(template_name="Items/change_password.html"), name="reset_password"
+    ),
     path("invite/", views.InviteLink.as_view(), name="invite"),
-    path("api/", include('Items.api.urls')),
+    path("api/", include("Items.api.urls")),
 ]
-
-
-
-

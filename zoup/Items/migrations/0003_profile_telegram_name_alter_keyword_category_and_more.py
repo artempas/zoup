@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("Items", "0002_remove_profile_family_profile__family"),
     ]
