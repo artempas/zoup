@@ -102,7 +102,6 @@ def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
 
 
 post_delete.connect(delete_if_no_members_left, Profile)
-# pre_save.connect(delete_if_no_members_left,Profile)
 
 
 # noinspection PyUnusedLocal
@@ -117,7 +116,12 @@ post_save.connect(create_user_profile, sender=User)
 class Product(models.Model):
     name = models.CharField(max_length=255)
     category = models.ForeignKey(
-        to=Category, to_field="name", on_delete=models.SET_DEFAULT, null=False, default="Другое", related_name="get_products"
+        to=Category,
+        to_field="name",
+        on_delete=models.SET_DEFAULT,
+        null=False,
+        default="Другое",
+        related_name="get_products",
     )
     created_date = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(

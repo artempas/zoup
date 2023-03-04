@@ -6,7 +6,7 @@ from Items.models import Product, Category, Family, Profile, Keyword
 
 # Register your models here.
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "created_by", "family", "created_date")
+    list_display = ("name", "category", "created_by", "family", "created_date", "to_notify")
 
 
 admin.site.register(Product, ProductAdmin)
