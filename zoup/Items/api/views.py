@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.generics import GenericAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ class Products(GenericAPIView):
             if "chat_id" not in request.data:
                 return HttpResponseBadRequest("chat_id")
             family = Profile.objects.get(chat_id=request.query_params.get("chat_id")).family
-            products = Product.objects.filter(family=family)
+            products = self.queryset.filter(family=family)
             serialized_objects = self.serializer_class(products, many=True)
         return Response(serialized_objects.data)
 
@@ -35,7 +36,7 @@ class Products(GenericAPIView):
             return HttpResponseNotFound("Family not found")
         data["family"] = usr.profile.family.id
         del data["chat_id"]
-        serialized = self.serializer_class(data=request.data)
+        serialized = self.serializer_class(data=data)
         serialized.is_valid(raise_exception=True)
         serialized.save()
         return Response(serialized.data)
@@ -57,8 +58,20 @@ class Products(GenericAPIView):
     def put(self, request: Request, pk: int):
         if not pk:
             return HttpResponseBadRequest("Update without slug is not implemented")
-        instance = Product.objects.get(id=pk)
+        instance = self.queryset.get(id=pk)
         serialized = self.serializer_class(data=request.data, instance=instance, partial=True)
         serialized.is_valid(raise_exception=True)
         serialized.save()
         return Response(serialized.data)
+
+
+class Users(GenericAPIView):
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
+
+    def get(self, request: Request):
+        try:
+            user = self.queryset.get(profile__chat_id=request.query_params.get("chat_id"))
+            return Response(self.serializer_class(user).data)
+        except ObjectDoesNotExist:
+            return Http404("No user found matching query")
