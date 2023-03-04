@@ -1,5 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.generics import GenericAPIView
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from Items.api.serializers import *
@@ -10,19 +11,27 @@ from django.http import HttpResponseBadRequest, HttpResponseNotFound
 
 class Products(GenericAPIView):
     serializer_class = ProductSerializer
-    queryset = Product.objects.all()
+    queryset = Product.objects.all().order_by("category__name", "name")
+    pagination_class = PageNumberPagination
 
-    def get(self, request: Request, pk: int):
+    def get(self, request: Request, pk: int = None):
         if pk:
             products = get_object_or_404(Product, id=pk)
             serialized_objects = self.serializer_class(products)
         else:
-            if "chat_id" not in request.data:
+            if "chat_id" not in request.query_params:
                 return HttpResponseBadRequest("chat_id")
             family = Profile.objects.get(chat_id=request.query_params.get("chat_id")).family
             products = self.queryset.filter(family=family)
+            if "page" in request.query_params:
+                products = self.paginate_queryset(products)
+            if request.query_params.get("category"):
+                products = products.filter(category__name=request.query_params.get("category"))
             serialized_objects = self.serializer_class(products, many=True)
-        return Response(serialized_objects.data)
+        if "page" in request.query_params:
+            return self.get_paginated_response(serialized_objects.data)
+        else:
+            return Response(serialized_objects.data)
 
     def post(self, request: Request, pk=None):
         if pk:
