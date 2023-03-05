@@ -1,3 +1,5 @@
+import re
+
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -21,7 +23,7 @@ class Products(GenericAPIView):
         else:
             if "chat_id" not in request.query_params:
                 return HttpResponseBadRequest("chat_id")
-            family = Profile.objects.get(chat_id=request.query_params.get("chat_id")).family
+            family = get_object_or_404(Profile, chat_id=request.query_params["chat_id"]).family
             products = self.queryset.filter(family=family)
             if "page" in request.query_params:
                 products = self.paginate_queryset(products)
@@ -36,15 +38,23 @@ class Products(GenericAPIView):
     def post(self, request: Request, pk=None):
         if pk:
             return HttpResponseBadRequest("Create method is not implemented for slug url")
-        if "chat_id" not in request.data:
+        if "chat_id" not in request.query_params:
             return HttpResponseBadRequest("chat_id")
         data = request.data
-        usr = get_object_or_404(User, profile__chat_id=request.data["chat_id"])
-        data["created_by"] = usr.id
+        if "category" not in data:
+            data["category"] = Product.determine_category(data.get("name"))
+        if "to_notify" not in data:
+            try:
+                data["to_notify"] = "срочно" in data["name"]
+                data["name"] = re.compile("срочно", re.IGNORECASE | re.UNICODE).sub("", data["name"])
+            except KeyError:  # if name is not in data serializer is responsible to send error
+                pass
+        usr = get_object_or_404(User, profile__chat_id=request.query_params["chat_id"])
+        data["user_id"] = usr.id
         if not usr.profile.family:
             return HttpResponseNotFound("Family not found")
         data["family"] = usr.profile.family.id
-        del data["chat_id"]
+        print(data)
         serialized = self.serializer_class(data=data)
         serialized.is_valid(raise_exception=True)
         serialized.save()
@@ -57,7 +67,7 @@ class Products(GenericAPIView):
         if "chat_id" not in request.data:
             return HttpResponseBadRequest("chat_id")
         filter_by = request.data
-        filter_by["family"] = Profile.objects.get(chat_id=filter_by["chat_id"]).family
+        filter_by["family"] = get_object_or_404(Profile, request.data["chat_id"])
         del filter_by["chat_id"]
         objects_to_delete = Product.objects.filter(**filter_by)
         deleted = len(objects_to_delete)

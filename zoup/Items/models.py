@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from jwt import encode, decode
 from jwt.exceptions import InvalidTokenError
 from os import environ
+from pymorphy2 import MorphAnalyzer
 
 
 # Create your models here.
@@ -61,7 +62,7 @@ class Family(models.Model):
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     chat_id = models.PositiveBigIntegerField(blank=True, null=True)
-    telegram_name = models.CharField(blank=True, max_length=255, null=True)
+    telegram_name = models.CharField(blank=True, max_length=255, null=True)  # telegram name contains
     _family = models.ForeignKey(to=Family, on_delete=models.SET_NULL, null=True, blank=True, related_name="members")
 
     def __init__(self, *args, **kwargs):
@@ -135,6 +136,25 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.name}"
+
+    @staticmethod
+    def determine_category(name) -> Category:
+        morph = MorphAnalyzer()
+        for word in name.split():
+            parsed = morph.parse(word)
+            if not parsed:
+                continue
+            try:
+                normalized = parsed[0].normal_form.lower()
+            except Exception as e:
+                print(e)  # TODO Logging
+                continue
+            else:
+                try:
+                    return Keyword.objects.get(keyword__iexact=normalized).category
+                except Keyword.DoesNotExist:
+                    continue
+        return Category.objects.get(name="Другое")
 
     def __repr__(self):
         if self.created_by:
