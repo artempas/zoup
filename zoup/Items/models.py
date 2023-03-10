@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.http import Http404
@@ -5,6 +7,7 @@ from django.db.models.signals import post_save, post_delete
 from django.shortcuts import get_object_or_404
 from jwt import encode, decode
 from jwt.exceptions import InvalidTokenError
+from telebot.types import InlineKeyboardButton
 from os import environ
 from pymorphy2 import MorphAnalyzer
 
@@ -133,6 +136,19 @@ class Product(models.Model):
     )
     family = models.ForeignKey(to=Family, on_delete=models.CASCADE, related_name="get_products")
     to_notify = models.BooleanField(default=False)
+    message_id = models.IntegerField(blank=True)
+
+    @classmethod
+    def from_message(cls, name: str, created_by: User, message_id: int):
+        to_notify = "срочно" in name.lower()
+        if to_notify:
+            name = re.compile("срочно", re.IGNORECASE | re.UNICODE).sub("", name)
+        return cls(name=name,
+                   category=cls.determine_category(name),
+                   created_by=created_by,
+                   family=created_by.profile.family,
+                   to_notify=to_notify,
+                   message_id=message_id)
 
     def __str__(self):
         return f"{self.name}"
@@ -156,8 +172,24 @@ class Product(models.Model):
                     continue
         return Category.objects.get(name="Другое")
 
+    def to_button(self, page: int):
+        return InlineKeyboardButton(f"✅❗️{self.name}❗️" if self.to_notify else f"✅{self.name}",
+                                    callback_data=f"p&{self.id}&{page}")
+
     def __repr__(self):
         if self.created_by:
             return f"{self.name} ({self.category}) was created by {self.created_by} at {self.created_date} for {self.family}"
         else:
             return f"{self.name} ({self.category}) was created by (creator deleted) at {self.created_date} for {self.family}"
+
+    def to_string(self) -> str:
+        if self.to_notify:
+            if self.created_by:
+                return f"❗️ {self.name} (<a href=\"tg://user?id={self.created_by.profile.chat_id}\">{self.created_by.username}</a>)"
+            else:
+                return f"❗️ {self.name}"
+        else:
+            if self.created_by:
+                return f"🔘 {self.name} (<a href=\"tg://user?id={self.created_by.profile.chat_id}\">{self.created_by.username}</a>)"
+            else:
+                return f"🔘 {self.name}"

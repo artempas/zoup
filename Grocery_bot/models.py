@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from os import environ
+
+from dotenv import load_dotenv
+
 import api
 
 
@@ -51,11 +55,29 @@ class Product:
         return list(cls(**i) for i in json)
 
     @classmethod
-    def by_name(cls, name: str, chat_id: int) -> "Product":
+    def create_from_name(cls, name: str, chat_id: int) -> "Product":
         return cls(**api.create_product(name, chat_id))
 
-    def delete(self) -> "Product":
-        pass
+    def delete(self, chat_id: int) -> int:
+        """
+        Delete product from db. Returns amount of deleted items. Sets None to all fields
+        @param chat_id:
+        @return:
+        """
+        for attr in self.__dict__:
+            setattr(self, attr, None)
+        return api.delete_product(chat_id=chat_id, id=self.id)
 
-    def update(self) -> "Product":
-        pass
+    def update(self, chat_id: int) -> "Product":
+        return self.__class__(**api.update_product(chat_id, self.id))
+
+
+if __name__ == '__main__':
+    cart = Product.get(354640082)
+    print(f"{cart=}")
+    cart.append(Product.create_from_name("Хлеб", 354640082))
+    print(f"created_from_name = {cart[-1]}")
+    cart[-1].name = "Помидор"
+    cart[-1].update(354640082)
+    print(f"updated = {cart[-1]}")
+    print(f"deleted = {cart[-1].delete(354640082)}")

@@ -1,3 +1,5 @@
+from multiprocessing import Process
+
 from django.contrib.auth import logout, login
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -8,6 +10,7 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from urllib.parse import quote_plus
 from .forms import RegistrationForm, LoginUserForm, ChangeUsernameForm
+from .main import bot
 from .models import *
 from django.views.generic import ListView, CreateView, UpdateView, TemplateView
 

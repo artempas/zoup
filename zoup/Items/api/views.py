@@ -1,14 +1,16 @@
 import re
 
+import telebot.types
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from Items.api.serializers import *
+from Items.main import bot
 from Items.models import *
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponseBadRequest, HttpResponseNotFound
+from django.http import HttpResponseBadRequest, HttpResponseNotFound, HttpRequest, HttpResponse
 
 
 class Products(GenericAPIView):
@@ -78,7 +80,10 @@ class Products(GenericAPIView):
         if not pk:
             return HttpResponseBadRequest("Update without slug is not implemented")
         instance = self.queryset.get(id=pk)
-        serialized = self.serializer_class(data=request.data, instance=instance, partial=True)
+        data = request.data
+        if "category" not in data:
+            data["category"] = Product.determine_category(data.get("name"))
+        serialized = self.serializer_class(data=data, instance=instance, partial=True)
         serialized.is_valid(raise_exception=True)
         serialized.save()
         return Response(serialized.data)
@@ -94,3 +99,10 @@ class Users(GenericAPIView):
             return Response(self.serializer_class(user).data)
         except ObjectDoesNotExist:
             return Http404("No user found matching query")
+
+def bot_webhook(request:HttpRequest):
+    if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("settings_token"):
+        return HttpResponse("Unauthorized", status=403)
+    update = telebot.types.Update.de_json(request.POST)
+    bot.process_new_updates([update])
+    return HttpResponse("OK")
