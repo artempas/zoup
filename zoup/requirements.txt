@@ -6,3 +6,4 @@ djangorestframework~=3.14.0
 pyjwt~=2.6.0
 gunicorn~=20.1
 pymorphy2~=0.9.1
+pytelegrambotapi

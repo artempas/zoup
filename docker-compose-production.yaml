@@ -24,21 +24,22 @@ services:
       restart: always
   web:
     build: ./zoup
-    command: python manage.py runserver 0.0.0.0:8000
+    command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
     volumes:
-      - ./zoup/:/root/zoup/zoup/
-    ports:
-      - 8000:8000
+      - static_volume:/home/app/web/staticfiles
+    expose:
+      - 8000
+    depends_on:
+      - db
   nginx:
     build:
       ./nginx
     volumes:
-      - /root/zoup/zoup/Items/static:/home/app/web/static
+      - static_volume:/home/app/web/staticfiles
     ports:
-      - "80:80"
+      - 80:80
     depends_on:
-      - django_gunicorn
+      - web
 volumes:
-  static:
-  media:
+  static_volume:
   postgres_data:
