@@ -2,6 +2,7 @@ import re
 
 import telebot.types
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.handlers.wsgi import WSGIRequest
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.generics import GenericAPIView
@@ -107,9 +108,9 @@ class Users(GenericAPIView):
 
 
 @csrf_exempt
-def bot_webhook(request: HttpRequest):
+def bot_webhook(request: WSGIRequest):
     if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("WEBHOOK_SECRET_KEY"):
         return HttpResponse("Unauthorized", status=403)
-    update = telebot.types.Update.de_json(request.data)
+    update = telebot.types.Update.de_json(request.body)
     bot.process_new_updates([update])
     return HttpResponse("OK")
