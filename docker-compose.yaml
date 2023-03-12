@@ -1,9 +1,8 @@
 version: "3.9"
 services:
   db:
-    image: postgres:13.0-alpine
+    image: postgres
     container_name: zoup-postgres #you can change this
-    user: postgres
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
@@ -24,21 +23,11 @@ services:
       restart: always
   web:
     build: ./zoup
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - ./zoup/:/root/zoup/zoup/
+    command: python manage.py runserver
     ports:
-      - 8000:8000
-  nginx:
-    build:
-      ./nginx
-    volumes:
-      - /root/zoup/zoup/Items/static:/home/app/web/static
-    ports:
-      - "80:80"
+      - "8000:8000"
     depends_on:
-      - django_gunicorn
+      - db
+
 volumes:
-  static:
-  media:
   postgres_data:

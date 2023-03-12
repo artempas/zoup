@@ -2,6 +2,7 @@ import re
 
 import telebot.types
 from django.core.exceptions import ObjectDoesNotExist
+from django.urls import reverse_lazy
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
@@ -100,8 +101,12 @@ class Users(GenericAPIView):
         except ObjectDoesNotExist:
             return Http404("No user found matching query")
 
-def bot_webhook(request:HttpRequest):
-    if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("settings_token"):
+
+
+
+
+def bot_webhook(request: HttpRequest):
+    if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("WEBHOOK_SECRET_KEY"):
         return HttpResponse("Unauthorized", status=403)
     update = telebot.types.Update.de_json(request.POST)
     bot.process_new_updates([update])

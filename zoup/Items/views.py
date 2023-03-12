@@ -15,6 +15,7 @@ from .models import *
 from django.views.generic import ListView, CreateView, UpdateView, TemplateView
 
 
+
 class ItemList(LoginRequiredMixin, ListView):
     login_url = reverse_lazy("login")
     model = Product
