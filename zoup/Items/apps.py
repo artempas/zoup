@@ -1,7 +1,6 @@
 from time import sleep
 
 from django.apps import AppConfig
-from django.contrib.sites.models import Site
 from telebot import TeleBot
 from os import environ
 from dotenv import load_dotenv
