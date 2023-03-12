@@ -111,6 +111,6 @@ class Users(GenericAPIView):
 def bot_webhook(request: WSGIRequest):
     if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("WEBHOOK_SECRET_KEY"):
         return HttpResponse("Unauthorized", status=403)
-    update = telebot.types.Update.de_json(request.body)
+    update = telebot.types.Update.de_json(request.body.decode())
     bot.process_new_updates([update])
     return HttpResponse("OK")
