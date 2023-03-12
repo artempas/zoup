@@ -32,14 +32,22 @@ services:
     depends_on:
       - db
   nginx:
-    build:
-      ./nginx
+    image: nginx:latest
     volumes:
       - static_volume:/home/app/web/staticfiles
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+      - ./nginx/conf/:/etc/nginx/conf.d/:ro
+      - ./certbot/www:/var/www/certbot/:ro
     ports:
       - 80:80
+      - 443:443
     depends_on:
       - web
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+      - ./certbot/www/:/var/www/certbot/:rw
 volumes:
   static_volume:
   postgres_data:

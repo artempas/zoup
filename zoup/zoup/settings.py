@@ -31,7 +31,7 @@ DEBUG = True
 
 
 ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1", "localhost", "46.151.24.37", "zoup.site"]
-
+CSRF_TRUSTED_ORIGINS = ['https://*.zoup.site','https://*.127.0.0.1']
 
 # Application definition
 
