@@ -12,11 +12,11 @@ from telebot.apihelper import ApiTelegramException
 class ItemsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "Items"
-    bot = TeleBot(environ.get("TELETOKEN"))
     logger = logging.getLogger("Items.apps")
 
     def ready(self):
         load_dotenv()
+        bot = TeleBot(environ.get("TELETOKEN"))
         if not environ.get("TEST_ENV"):
             self.bot.remove_webhook()
             sleep(1)
