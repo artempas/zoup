@@ -59,7 +59,7 @@ def get_inline_keyboard_page(
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_cart_text(products: QuerySet["Items.models.Product"]) -> str:
+def get_cart_text(products: QuerySet) -> str:
     if not products:
         return "Список пуст"
     else:
