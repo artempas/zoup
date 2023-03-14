@@ -147,15 +147,6 @@ def delete_if_no_members_left(sender, instance: Profile, *args, **kwargs):
 post_delete.connect(delete_if_no_members_left, Profile)
 
 
-# noinspection PyUnusedLocal
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-
-post_save.connect(create_user_profile, sender=User)
-
-
 class Product(models.Model):
     name = models.CharField(max_length=255)
     category = models.ForeignKey(
