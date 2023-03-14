@@ -21,7 +21,11 @@ bot = TeleBot(environ.get("TELETOKEN"))
 def log(func):
     def wrapper(*args, **kwargs):
         print(f"{func.__module__}.{func.__qualname__} ( {[str(i) for i in args]} )")
-        return func(*args, **kwargs)
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            print(exc)
+            return None
 
     return wrapper
 
