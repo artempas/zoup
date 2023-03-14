@@ -196,7 +196,7 @@ def remove_product(callback: CallbackQuery):
             message_id=callback.message.message_id,
             chat_id=callback.message.chat.id,
             text=text,
-            reply_markup=get_inline_keyboard_page(buttons, "", 1, 2, "list&{page}"),
+            reply_markup=get_inline_keyboard_page(buttons, 1, 2, "list&{page}"),
             parse_mode="HTML"
         )
     else:

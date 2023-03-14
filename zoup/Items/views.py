@@ -142,7 +142,7 @@ def link_telegram(request: WSGIRequest):
     request.user.profile.connect_telegram_by_token(request.GET.get("token"))
     try:
         request.user.profile.save()
-    except IntegrityError as exc:
+    except IntegrityError:
         return HttpResponse("Ошибка сохранения. Возможно telegram привязан к другому аккаунту", status=400)
     return HttpResponse("OK")
 
