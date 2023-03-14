@@ -1,4 +1,3 @@
-
 from django.urls import path
 from Items.api.views import Products, Users, bot_webhook
 
@@ -7,5 +6,5 @@ urlpatterns = [
     path("products/<int:pk>", Products.as_view()),
     path("users/", Products.as_view()),
     path("users", Users.as_view()),
-    path("bot_updates", bot_webhook)
+    path("bot_updates", bot_webhook),
 ]

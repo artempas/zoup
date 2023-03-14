@@ -3,16 +3,13 @@ from typing import Sequence
 from django.db.models import QuerySet
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from Items.models import Product
-
 
 def get_inline_keyboard_page(
-        items: Sequence[InlineKeyboardButton],
-        back_to: str,
-        page: int,
-        columns: int,
-        pagination_callback: str,
-        rows=9,
+    items: Sequence[InlineKeyboardButton],
+    page: int,
+    columns: int,
+    pagination_callback: str,
+    rows=9,
 ) -> InlineKeyboardMarkup:
     """
 
@@ -33,7 +30,7 @@ def get_inline_keyboard_page(
     ends_on = starts_from + columns * rows
     keyboard = []
     for i in range(starts_from, min(len(items), ends_on), columns):
-        keyboard.append(items[i: i + columns])
+        keyboard.append(items[i : i + columns])
     btns = []
     if page > 1:
         btns.append(
@@ -46,7 +43,7 @@ def get_inline_keyboard_page(
         btns.append(
             InlineKeyboardButton(
                 f"{page}/{(len(items) / (columns * rows)).__ceil__()}",
-                callback_data=back_to,
+                callback_data=f"{page}/{(len(items) / (columns * rows)).__ceil__()}",
             )
         )
     # else:
@@ -55,14 +52,14 @@ def get_inline_keyboard_page(
         btns.append(
             InlineKeyboardButton(
                 "=>",
-                callback_data=pagination_callback.format(page=str(page - 1)),
+                callback_data=pagination_callback.format(page=str(page + 1)),
             )
         )
     keyboard.append(btns)
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_cart_text(products: QuerySet[Product]) -> str:
+def get_cart_text(products: QuerySet["Items.models.Product"]) -> str:
     if not products:
         return "Список пуст"
     else:
@@ -72,5 +69,5 @@ def get_cart_text(products: QuerySet[Product]) -> str:
             if product.category != current_category:
                 text += f"\t{current_category.name}\n"
                 current_category = product.category
-            text += product.to_string() + '\n'
+            text += product.to_string() + "\n"
     return text

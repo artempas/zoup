@@ -31,7 +31,7 @@ DEBUG = True
 
 
 ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1", "localhost", "46.151.24.37", "zoup.site"]
-CSRF_TRUSTED_ORIGINS = ['https://*.zoup.site','https://*.127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ["https://*.zoup.site", "https://*.127.0.0.1"]
 
 # Application definition
 
@@ -93,7 +93,7 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_NAME"),
         "USER": os.environ.get("POSTGRES_USER"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
-        "HOST": "db",
+        "HOST": "db" if not os.environ.get("TEST_ENV") and os.environ.get("DOCKER") else "localhost",
         "PORT": "5432",
     }
 }
@@ -134,12 +134,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = "/static/"
-STATIC_ROOT= BASE_DIR / "staticfiles"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 # STATICFILES_DIRS=(os.path.join(BASE_DIR.parent,'Items','static'),)
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login"
-LOGIN_REDIRECT_URL = "/items"
+LOGIN_REDIRECT_URL = "/"
 AUTH_PROFILE_MODULE = "accounts.Profile"

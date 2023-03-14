@@ -1,33 +1,17 @@
-version: "3.9"
+version: "3.1"
 services:
   db:
+    restart: always
     image: postgres
-    container_name: zoup-postgres #you can change this
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=zoup
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-
-  pgadmin:
-      image: dpage/pgadmin4
-      container_name: zoup-pgadmin #you can change this
-      depends_on:
-        - db
-      ports:
-        - "5051:80"
-      environment:
-        PGADMIN_DEFAULT_EMAIL: admin@admin.com
-        PGADMIN_DEFAULT_PASSWORD: admin
-      restart: always
-  web:
-    build: ./zoup
-    command: python manage.py runserver
+      - POSTGRES_PORT=5432
     ports:
-      - "8000:8000"
-    depends_on:
-      - db
+      - "5432:5432"
+    volumes:
+      - .postgres_data:/var/lib/postgresql/data/
 
 volumes:
   postgres_data:

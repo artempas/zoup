@@ -7,7 +7,8 @@ from telebot.types import Message, CallbackQuery
 from telebot.apihelper import ApiException
 from os import environ
 from telebot.util import quick_markup
-from Items.models import *
+from Items import models
+from pymorphy2 import MorphAnalyzer
 from dotenv import load_dotenv
 from Items.tools import get_inline_keyboard_page, get_cart_text
 
@@ -19,9 +20,7 @@ bot = TeleBot(environ.get("TELETOKEN"))
 
 def log(func):
     def wrapper(*args, **kwargs):
-        func_args = inspect.signature(func).bind(*args, **kwargs).arguments
-        func_args_str = ", ".join(map("{0[0]} = {0[1]!r}".format, func_args.items()))
-        logger.info(f"{func.__module__}.{func.__qualname__} ( {func_args_str} )")
+        print(f"{func.__module__}.{func.__qualname__} ( {[str(i) for i in args]} )")
         return func(*args, **kwargs)
 
     return wrapper
@@ -31,14 +30,50 @@ def login_required(func):
     def wrapper(*args, **kwargs):
         if type(args[0]) is Message:
             try:
-                if Profile.objects.get(chat_id=args[0].from_user.id).family:
+                if models.Profile.objects.get(chat_id=args[0].from_user.id).family:
                     return func(*args, **kwargs)
                 else:
-                    bot.send_message(args[0].chat.id, f"Необходимо войти в семью!", reply_markup=quick_markup(
-                        {"Создать семью": {"url": environ.get("DOMAIN") + ""}}))  # TODO Create family URL
-            except Profile.DoesNotExist:
-                bot.send_message(args[0].chat.id, f"Необходимо авторизоваться!", reply_markup=quick_markup(
-                    {"Создать семью": {"url": environ.get("DOMAIN") + "login"}}))
+                    bot.send_message(
+                        args[0].chat.id,
+                        f"Кажется вас нет ни в одной семье",
+                        reply_markup=quick_markup({"Создать семью": {"url": environ.get("DOMAIN") + "/create_family"}}),
+                    )  # TODO Create family URL
+            except models.Profile.DoesNotExist:
+                bot.send_message(
+                    args[0].chat.id,
+                    f"Необходимо авторизоваться",
+                    reply_markup=quick_markup(
+                        {
+                            "Авторизация": {
+                                "url": environ.get("DOMAIN")
+                                       + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
+                            }
+                        }
+                    ),
+                )
+        elif type(args[0]) is CallbackQuery:
+            try:
+                if models.Profile.objects.get(chat_id=args[0].from_user.id).family:
+                    return func(*args, **kwargs)
+                else:
+                    bot.send_message(
+                        args[0].message.chat.id,
+                        f"Кажется вас нет ни в одной семье",
+                        reply_markup=quick_markup({"Создать семью": {"url": environ.get("DOMAIN") + "/create_family"}}),
+                    )  # TODO Create family URL
+            except models.Profile.DoesNotExist:
+                bot.send_message(
+                    args[0].message.chat.id,
+                    f"Необходимо авторизоваться",
+                    reply_markup=quick_markup(
+                        {
+                            "Авторизация": {
+                                "url": environ.get("DOMAIN")
+                                       + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
+                            }
+                        }
+                    ),
+                )
 
     return wrapper
 
@@ -47,7 +82,7 @@ def login_required(func):
 def notify(text: str, users: list[int]):
     for user in users:
         try:
-            bot.send_message(user, text)
+            bot.send_message(user, text, parse_mode="HTML")
         except ApiException as e:
             logging.error(e)
 
@@ -80,33 +115,60 @@ def helper(msg):
 /register - создать семью\n
 /join - присоединиться к существующей семье\n\n\n
 Created by: @artem_pas
-""")
+""",
+    )
 
 
-@log
-@login_required
 @bot.message_handler(commands=["list"])
+@login_required
+@log
 def show_list(msg: Message):
-    family = Profile.objects.get(chat_id=msg.from_user.id).family
-    products: QuerySet[Product] = family.get_products.all().order_by("category", "name")
+    family = models.Profile.objects.get(chat_id=msg.from_user.id).family
+    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
     text = get_cart_text(products)
     if products:
         buttons = [i.to_button(1) for i in products]
-        bot.send_message(msg.chat.id, text, reply_markup=get_inline_keyboard_page(buttons, "", 1, 2, "list&{page}"))
+        bot.send_message(
+            msg.chat.id,
+            text,
+            reply_markup=get_inline_keyboard_page(buttons, 1, 2, "list&{page}"),
+            parse_mode="HTML",
+        )
     else:
         bot.send_message(msg.chat.id, text)
 
 
-@log
+@bot.callback_query_handler(func=lambda callback: callback.data.split("&")[0] == 'list')
 @login_required
+@log
+def show_list(callback: CallbackQuery):
+    family = models.Profile.objects.get(chat_id=callback.from_user.id).family
+    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
+    text = get_cart_text(products)
+    if products:
+        buttons = [i.to_button(1) for i in products]
+        bot.edit_message_text(
+            text,
+            callback.message.chat.id,
+            callback.message.message_id,
+            reply_markup=get_inline_keyboard_page(buttons, int(callback.data.split("&")[1]), 2, "list&{page}"),
+            parse_mode="HTML",
+        )
+    else:
+        bot.edit_message_text(text, callback.message.chat.id, callback.message.message_id)
+
+
 @bot.callback_query_handler(func=lambda msg: "p" in msg.data.split("&"))
+@login_required
+@log
 def remove_product(callback: CallbackQuery):
-    family = Profile.objects.get(chat_id=callback.from_user.id).family
+    family = models.Profile.objects.get(chat_id=callback.from_user.id).family
     _, product_id, page = callback.data.split("&")
     queryset = family.get_products.all()
     try:
-        deleted = queryset.get(id=product_id).delete()
-    except Product.DoesNotExist:
+        deleted = queryset.get(id=product_id)
+        deleted.delete()
+    except models.Product.DoesNotExist:
         bot.answer_callback_query(callback.id, f"{product_id} не существует")
     else:
         morph = MorphAnalyzer()
@@ -116,30 +178,30 @@ def remove_product(callback: CallbackQuery):
                 first_noun = word
                 break
         if first_noun is None:
-            bot.send_message(callback.message.chat.id, f"{deleted.name} удален(a) из списка")
+            bot.answer_callback_query(callback.id, f"{deleted.name} удален(a) из списка")
         parsed = morph.parse(first_noun)[0]
         inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
         bot.answer_callback_query(
-            callback.id,
-            f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка")
-    products: QuerySet[Product] = family.get_products.all().order_by("category", "name")
+            callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
+        )
+    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
     text = get_cart_text(products)
     if products:
         buttons = [i.to_button(page) for i in products]
         bot.edit_message_text(
             message_id=callback.message.message_id,
-            chat_id=callback.message.chat.id, text=text,
-            reply_markup=get_inline_keyboard_page(buttons, "", 1, 2, "list&{page}")
+            chat_id=callback.message.chat.id,
+            text=text,
+            reply_markup=get_inline_keyboard_page(buttons, "", 1, 2, "list&{page}"),
+            parse_mode="HTML"
         )
     else:
-        bot.edit_message_text(
-            message_id=callback.message.message_id,
-            chat_id=callback.message.chat.id, text=text)
+        bot.edit_message_text(message_id=callback.message.message_id, chat_id=callback.message.chat.id, text=text)
 
 
+@bot.message_handler(commands=["clear_list"])
 @log
 @login_required
-@bot.message_handler(commands=["clear_list"])
 def clear_list(msg):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("✅ Да, удалить!", callback_data="clear&yes"))
@@ -151,19 +213,21 @@ def clear_list(msg):
     )
 
 
+@bot.callback_query_handler(func=lambda msg: msg.data.split("&")[0] == "clear")
 @log
 @login_required
-@bot.callback_query_handler(func=lambda msg: msg.data.split("&")[1] == "clear")
 def clear_confirmed(callback: CallbackQuery):
     clear = callback.data.split("&")[1] == "yes"
     if clear:
-        Profile.objects.get(chat_id=callback.from_user.id).family.get_products.all().delete()
+        models.Profile.objects.get(chat_id=callback.from_user.id).family.get_products.all().delete()
         bot.answer_callback_query(callback.id, "Cleared")
-        bot.edit_message_text("Список успешно очищен", chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id)
+        bot.edit_message_text(
+            "Список успешно очищен", chat_id=callback.message.chat.id, message_id=callback.message.message_id
+        )
     else:
-        bot.edit_message_text("Очистка отменена", chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id)
+        bot.edit_message_text(
+            "Очистка отменена", chat_id=callback.message.chat.id, message_id=callback.message.message_id
+        )
 
 
 # @bot.message_handler(commands=['notify'])
@@ -234,27 +298,28 @@ def clear_confirmed(callback: CallbackQuery):
 #         bot.send_message(msg.chat.id, db.run_anything(msg.text))
 #         bot.register_next_step_handler_by_chat_id(msg.chat.id, sql)
 
+
+@bot.edited_message_handler(func=lambda x: True)
 @log
 @login_required
-@bot.edited_message_handler(func=lambda x: True)
 def edit_product(msg: Message):
-    queryset = Profile.objects.get(chat_id=msg.from_user.id).family.get_products
+    queryset = models.Profile.objects.get(chat_id=msg.from_user.id).family.get_products
     try:
         product = queryset.get(msg.message_id)
-    except Product.DoesNotExist:
+    except models.Product.DoesNotExist:
         return
     product.name = msg.text
-    product.category = Product.determine_category(msg.text)
+    product.category = models.Product.determine_category(msg.text)
     product.save()
     bot.reply_to(msg, "Изменено")
 
 
-@log
-@login_required
 @bot.message_handler(content_types=["text"])
+@login_required
+@log
 def add_product(msg: Message):
-    user = User.objects.get(profile__chat_id=msg.from_user.id)
-    product = Product.from_message(name=msg.text, created_by=user, message_id=msg.message_id)
+    user = models.User.objects.get(profile__chat_id=msg.from_user.id)
+    product = models.Product.from_message(name=msg.text, created_by=user, message_id=msg.message_id)
     product.save()
     morph = MorphAnalyzer()
     first_noun = None
@@ -264,10 +329,14 @@ def add_product(msg: Message):
             break
     if first_noun is None:
         bot.send_message(msg.chat.id, f"{product.name} успешно добавлен(a) в список")
-    parsed = morph.parse(first_noun)[0]
-    inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-    bot.send_message(
-        msg.chat.id,
-        f"{product.name} успешно {morph.parse('добавлен')[0].inflect(inflect_to).word} в список")
+    else:
+        parsed = morph.parse(first_noun)[0]
+        inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
+        bot.send_message(
+            msg.chat.id, f"{product.name} успешно {morph.parse('добавлен')[0].inflect(inflect_to).word} в список"
+        )
 
 
+@bot.callback_query_handler(func=lambda x: True)
+def echo(callback: CallbackQuery):
+    bot.answer_callback_query(callback.id, callback.data)

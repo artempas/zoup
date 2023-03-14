@@ -13,7 +13,7 @@ from Items.api.serializers import *
 from Items.main import bot
 from Items.models import *
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponseBadRequest, HttpResponseNotFound, HttpRequest, HttpResponse
+from django.http import HttpResponseBadRequest, HttpResponseNotFound, HttpRequest, HttpResponse, Http404
 
 
 class Products(GenericAPIView):
@@ -104,12 +104,9 @@ class Users(GenericAPIView):
             return Http404("No user found matching query")
 
 
-
-
-
 @csrf_exempt
 def bot_webhook(request: WSGIRequest):
-    if request.headers.get('X-Telegram-Bot-Api-Secret-Token') != environ.get("WEBHOOK_SECRET_KEY"):
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != environ.get("WEBHOOK_SECRET_KEY"):
         return HttpResponse("Unauthorized", status=403)
     update = telebot.types.Update.de_json(request.body.decode())
     bot.process_new_updates([update])

@@ -1,3 +1,5 @@
+from os import environ
+from dotenv import load_dotenv
 from django.urls import path, include
 from django.contrib.auth.views import LogoutView, PasswordChangeView
 from django.urls import path
@@ -17,4 +19,8 @@ urlpatterns = [
     ),
     path("invite/", views.InviteLink.as_view(), name="invite"),
     path("api/", include("Items.api.urls")),
+    path("link_telegram", views.link_telegram),
 ]
+load_dotenv()
+if environ.get("TEST_ENV"):
+    urlpatterns.append(path("start_pooling", views.pooling))
