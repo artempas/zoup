@@ -23,13 +23,13 @@ class ItemList(LoginRequiredMixin, ListView):
     model = Product
     template_name = "Items/index.html"
 
-    # def get_queryset(self):
-    #     try:
-    #         return self.model.objects.filter(family=self.request.user.profile.family)
-    #     except Profile.DoesNotExist:
-    #         self.request.user.profile = Profile()
-    #         self.request.user.profile.save()
-    #         return self.model.objects.filter(family=self.request.user.profile.family)
+    def get_queryset(self):
+        try:
+            return self.model.objects.filter(family=self.request.user.profile.family)
+        except Profile.DoesNotExist:
+            self.request.user.profile = Profile()
+            self.request.user.profile.save()
+            return self.model.objects.filter(family=self.request.user.profile.family)
 
     def get_context_data(self, **kwargs):
         context = super(ItemList, self).get_context_data(**kwargs)
