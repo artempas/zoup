@@ -18,8 +18,8 @@ class ItemsConfig(AppConfig):
         load_dotenv()
         bot = TeleBot(environ.get("TELETOKEN"))
         if not environ.get("TEST_ENV"):
-            self.bot.remove_webhook()
+            bot.remove_webhook()
             sleep(1)
-            self.bot.set_webhook(
+            bot.set_webhook(
                 url=environ.get("DOMAIN") + "/api/bot_updates", secret_token=environ.get("WEBHOOK_SECRET_KEY")
             )
