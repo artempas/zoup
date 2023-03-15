@@ -149,11 +149,9 @@ def link_telegram(request: WSGIRequest):
 
 def start_pooling():
     bot.remove_webhook()
-    try:
-        print(f"Pooling {bot.user.username}")
-        bot.polling()
-    except ApiTelegramException:
-        return
+    print(f"Pooling {bot.user.username}")
+    bot.polling()
+
 
 
 def pooling(request):

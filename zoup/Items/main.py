@@ -336,7 +336,7 @@ def add_product(msg: Message):
     else:
         parsed = morph.parse(first_noun)[0]
         inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-        if inflect_to is None:
+        if parsed.tag.gender is None:
             bot.send_message(msg.chat.id, f"{product.name} успешно добавлен(a) в список")
         else:
             bot.send_message(

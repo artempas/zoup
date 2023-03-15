@@ -1,5 +1,6 @@
 import io
 import re
+from traceback import print_exc
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -195,7 +196,7 @@ class Product(models.Model):
             try:
                 normalized = parsed[0].normal_form.lower()
             except Exception as e:
-                print(e)  # TODO Logging
+                print_exc()
                 continue
             else:
                 try:
@@ -247,7 +248,7 @@ class Product(models.Model):
             else:
                 parsed = morph.parse(first_noun)[0]
                 inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-                if inflect_to is None:
+                if parsed.tag.gender is None:
                     text = f"{self.name} удален(a) из списка"
                 else:
                     text = f"{self.name} {morph.parse('куплено')[0].inflect(inflect_to).word}"
