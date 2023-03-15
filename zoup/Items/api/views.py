@@ -1,5 +1,4 @@
-import re
-
+from traceback import print_exc
 import telebot.types
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.handlers.wsgi import WSGIRequest
@@ -109,5 +108,8 @@ def bot_webhook(request: WSGIRequest):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != environ.get("WEBHOOK_SECRET_KEY"):
         return HttpResponse("Unauthorized", status=403)
     update = telebot.types.Update.de_json(request.body.decode())
-    bot.process_new_updates([update])
+    try:
+        bot.process_new_updates([update])
+    except Exception:
+        print_exc()
     return HttpResponse("OK")
