@@ -336,9 +336,12 @@ def add_product(msg: Message):
     else:
         parsed = morph.parse(first_noun)[0]
         inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-        bot.send_message(
-            msg.chat.id, f"{product.name} успешно {morph.parse('добавлен')[0].inflect(inflect_to).word} в список"
-        )
+        if inflect_to is None:
+            bot.send_message(msg.chat.id, f"{product.name} успешно добавлен(a) в список")
+        else:
+            bot.send_message(
+                msg.chat.id, f"{product.name} успешно {morph.parse('добавлен')[0].inflect(inflect_to).word} в список"
+            )
 
 
 @bot.callback_query_handler(func=lambda x: True)

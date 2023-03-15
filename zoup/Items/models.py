@@ -247,7 +247,10 @@ class Product(models.Model):
             else:
                 parsed = morph.parse(first_noun)[0]
                 inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-                text = f"{self.name} {morph.parse('куплено')[0].inflect(inflect_to).word}"
+                if inflect_to is None:
+                    text = f"{self.name} удален(a) из списка"
+                else:
+                    text = f"{self.name} {morph.parse('куплено')[0].inflect(inflect_to).word}"
             notify(text, [i.chat_id for i in self.family.members.all()])
         return super().delete(using, keep_parents)
 
