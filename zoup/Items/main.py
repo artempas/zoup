@@ -185,9 +185,12 @@ def remove_product(callback: CallbackQuery):
             bot.answer_callback_query(callback.id, f"{deleted.name} удален(a) из списка")
         parsed = morph.parse(first_noun)[0]
         inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-        bot.answer_callback_query(
-            callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
-        )
+        if parsed.tag.gender is None:
+            bot.answer_callback_query(callback.id, f"{deleted.name} удален(a) из списка")
+        else:
+            bot.answer_callback_query(
+                callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
+            )
     products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
     text = get_cart_text(products)
     if products:
