@@ -59,15 +59,15 @@ def get_inline_keyboard_page(
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_cart_text(products: QuerySet) -> str:
+def get_cart_text(products: list) -> str:
     if not products:
         return "Список пуст"
     else:
-        current_category = products[0].category
-        text = f"Список покупок:\n\n\t{current_category.name}\n"
+        current_category = ""
+        text = f"Список покупок:\n\n"
         for product in products:
             if product.category != current_category:
-                text += f"\t{current_category.name}\n"
                 current_category = product.category
+                text += f"\t{current_category.name}\n"
             text += product.to_string() + "\n"
     return text

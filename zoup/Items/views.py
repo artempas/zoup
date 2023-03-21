@@ -153,7 +153,6 @@ def start_pooling():
     bot.polling()
 
 
-
 def pooling(request):
     print(type(request))
     th = Thread(target=start_pooling)

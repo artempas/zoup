@@ -167,7 +167,7 @@ class Product(models.Model):
     )
     family = models.ForeignKey(to=Family, on_delete=models.CASCADE, related_name="get_products")
     to_notify = models.BooleanField(default=False)
-    message_id = models.IntegerField(blank=True)
+    message_id = models.IntegerField(blank=True, null=True)
 
     @classmethod
     def from_message(cls, name: str, created_by: User, message_id: int):
@@ -267,7 +267,9 @@ def notify_if_needed(sender, instance, created, **kwargs):
             text = f'<a href="tg://user?id={instance.created_by.profile.chat_id}">{instance.created_by.username}</a> срочно просит купить {name.getvalue()}'
         else:
             text = f"{instance.created_by.username} срочно просит купить {name.getvalue()}"
-        notify(text, [i.chat_id for i in instance.family.members.all() if i.chat_id and i != instance.created_by.profile])
+        notify(
+            text, [i.chat_id for i in instance.family.members.all() if i.chat_id and i != instance.created_by.profile]
+        )
 
 
 post_save.connect(notify_if_needed, sender=Product)

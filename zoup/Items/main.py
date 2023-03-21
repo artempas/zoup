@@ -1,7 +1,9 @@
 """
 Телеграм бот для составления списка покупок
 """
-from django.db.models import QuerySet
+from itertools import chain
+
+from django.db.models import QuerySet, Q
 from telebot import *
 from telebot.types import Message, CallbackQuery
 from telebot.apihelper import ApiException
@@ -50,7 +52,7 @@ def login_required(func):
                         {
                             "Авторизация": {
                                 "url": environ.get("DOMAIN")
-                                       + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
+                                + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
                             }
                         }
                     ),
@@ -73,7 +75,7 @@ def login_required(func):
                         {
                             "Авторизация": {
                                 "url": environ.get("DOMAIN")
-                                       + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
+                                + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
                             }
                         }
                     ),
@@ -128,7 +130,9 @@ Created by: @artem_pas
 @log
 def show_list(msg: Message):
     family = models.Profile.objects.get(chat_id=msg.from_user.id).family
-    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
+    other_products = family.get_products.filter(category__name="Другое").order_by("name")
+    categoried_products = family.get_products.filter(~Q(category__name="Другое")).order_by("category", "name")
+    products = list(chain(categoried_products, other_products))
     text = get_cart_text(products)
     if products:
         buttons = [i.to_button(1) for i in products]
@@ -142,12 +146,14 @@ def show_list(msg: Message):
         bot.send_message(msg.chat.id, text)
 
 
-@bot.callback_query_handler(func=lambda callback: callback.data.split("&")[0] == 'list')
+@bot.callback_query_handler(func=lambda callback: callback.data.split("&")[0] == "list")
 @login_required
 @log
 def show_list(callback: CallbackQuery):
     family = models.Profile.objects.get(chat_id=callback.from_user.id).family
-    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
+    other_products = family.get_products.filter(category__name="Другое").order_by("name")
+    categoried_products = family.get_products.filter(~Q(category__name="Другое")).order_by("category", "name")
+    products = list(chain(categoried_products, other_products))
     text = get_cart_text(products)
     if products:
         buttons = [i.to_button(1) for i in products]
@@ -191,7 +197,9 @@ def remove_product(callback: CallbackQuery):
             bot.answer_callback_query(
                 callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
             )
-    products: QuerySet[models.Product] = family.get_products.all().order_by("category", "name")
+    other_products = family.get_products.filter(category__name="Другое").order_by("name")
+    categoried_products = family.get_products.filter(~Q(category__name="Другое")).order_by("category", "name")
+    products = list(chain(categoried_products, other_products))
     text = get_cart_text(products)
     if products:
         buttons = [i.to_button(page) for i in products]
@@ -200,7 +208,7 @@ def remove_product(callback: CallbackQuery):
             chat_id=callback.message.chat.id,
             text=text,
             reply_markup=get_inline_keyboard_page(buttons, 1, 2, "list&{page}"),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     else:
         bot.edit_message_text(message_id=callback.message.message_id, chat_id=callback.message.chat.id, text=text)
