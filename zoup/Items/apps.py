@@ -16,6 +16,7 @@ class ItemsConfig(AppConfig):
 
     def ready(self):
         load_dotenv()
+        print(environ.get("TELETOKEN"), "TELETOKEN")
         bot = TeleBot(environ.get("TELETOKEN"))
         if not environ.get("TEST_ENV"):
             bot.remove_webhook()

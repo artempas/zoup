@@ -1,17 +1,65 @@
-version: "3.1"
+version: "3.9"
 services:
   db:
-    restart: always
-    image: postgres
+    image: postgres:13.0-alpine
+    container_name: zoup-postgres #you can change this
+    user: postgres
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=zoup
-      - POSTGRES_PORT=5432
-    ports:
-      - "5432:5432"
     volumes:
-      - .postgres_data:/var/lib/postgresql/data/
+      - postgres_data:/var/lib/postgresql/data/
 
+  pgadmin:
+      image: dpage/pgadmin4
+      container_name: zoup-pgadmin #you can change this
+      depends_on:
+        - db
+      ports:
+        - "5051:80"
+      environment:
+        PGADMIN_DEFAULT_EMAIL: admin@admin.com
+        PGADMIN_DEFAULT_PASSWORD: Prowler1-Junkie-Unbolted
+      restart: always
+  web:
+    build: ./zoup
+    restart: always
+    command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+    expose:
+      - 8000
+    depends_on:
+      - db
+  split-bot:
+    build: ../split-bill-bot
+    command: gunicorn --bind 0.0.0.0:5000 flask_app:app --access-logfile gunicorn_access.log --error-logfile gunicorn_error.log
+    volumes:
+      - ../split-bill-bot/:/usr/src/app/
+    expose:
+      - 5000
+  nginx:
+    image: nginx:latest
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+      - ./nginx/conf/:/etc/nginx/conf.d/:ro
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+    ports:
+      - 80:80
+      - 443:443
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    depends_on:
+      - web
+      - pgadmin
+      - split-bot
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 volumes:
+  static_volume:
   postgres_data:
