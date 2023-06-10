@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 certbot/
 docker-compose.yaml
+zoup.backup
 # C extensions
 *.so
 
