@@ -1,16 +1,13 @@
-version: "3.1"
+version: "3.9"
 services:
   db:
-    restart: always
-    image: postgres
+    image: postgres:13.0-alpine
     container_name: zoup-postgres #you can change this
+    user: postgres
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=zoup
-      - POSTGRES_PORT=5432
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 
@@ -23,42 +20,46 @@ services:
         - "5051:80"
       environment:
         PGADMIN_DEFAULT_EMAIL: admin@admin.com
-        PGADMIN_DEFAULT_PASSWORD: admin
+        PGADMIN_DEFAULT_PASSWORD: Prowler1-Junkie-Unbolted
       restart: always
-  django_gunicorn:
-    working_dir: /zoup
+  web:
     build: ./zoup
+    restart: always
     command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - static_volume:/home/app/web/staticfiles
     expose:
       - 8000
-    volumes:
-      - /root/zoup/zoup/Items/static:/home/app/web/static
-    environment:
-      - DJANGO_SETTINGS_MODULE=zoup.settings
-      - docker=1
     depends_on:
-      - redis
-  bot:
-    build: ./Grocery_bot
-    working_dir: /Grocery_bot
-    command: python main.py
+      - db
+  split-bot:
+    build: ../split-bill-bot
+    command: gunicorn --bind 0.0.0.0:5000 flask_app:app --access-logfile gunicorn_access.log --error-logfile gunicorn_error.log
     volumes:
-      - /root/zoup/Grocery_bot:/Grocery_bot
-#   depends_on:
-#      - django_gunicorn
-
-  redis:
-    image: redis:7.0
+      - ../split-bill-bot/:/usr/src/app/
+    expose:
+      - 5000
   nginx:
-    build:
-      ./nginx
+    image: nginx:latest
     volumes:
-      - /root/zoup/zoup/Items/static:/home/app/web/static
+      - static_volume:/home/app/web/staticfiles
+      - ./nginx/conf/:/etc/nginx/conf.d/:ro
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
     ports:
-      - "80:80"
+      - 80:80
+      - 443:443
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     depends_on:
-      - django_gunicorn
+      - web
+      - pgadmin
+      - split-bot
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 volumes:
-  static:
-  media:
+  static_volume:
   postgres_data:

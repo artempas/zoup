@@ -29,8 +29,9 @@ SECRET_KEY = os.environ.get("settings_token")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1"]
 
+ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1", "localhost", "46.151.24.37", "zoup.site"]
+CSRF_TRUSTED_ORIGINS = ["https://*.zoup.site", "https://*.127.0.0.1"]
 
 # Application definition
 
@@ -48,10 +49,7 @@ INSTALLED_APPS = [
 ]
 
 
-REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
-}
+REST_FRAMEWORK = {"DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination", "PAGE_SIZE": 20}
 
 
 MIDDLEWARE = [
@@ -65,7 +63,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "zoup.urls"
-STATICFILES_DIRS = (os.path.join(BASE_DIR, "Items", "static"),)
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -96,8 +93,8 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_NAME"),
         "USER": os.environ.get("POSTGRES_USER"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
-        "HOST": "localhost",
-        "PORT": 5432,
+        "HOST": "db" if not os.environ.get("TEST_ENV") else "localhost",
+        "PORT": "5432",
     }
 }
 
@@ -136,13 +133,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = "static/"
-# STATIC_ROOT="/home/app/web/static" if os.environ.get('docker') else None
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 # STATICFILES_DIRS=(os.path.join(BASE_DIR.parent,'Items','static'),)
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login"
-LOGIN_REDIRECT_URL = "/items"
+LOGIN_REDIRECT_URL = "/"
 AUTH_PROFILE_MODULE = "accounts.Profile"

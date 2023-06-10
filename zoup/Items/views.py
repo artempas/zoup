@@ -1,13 +1,19 @@
-from django.contrib.auth import logout, login
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from threading import Thread
+from django.db.utils import IntegrityError
+from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LogoutView, LoginView
+from django.contrib.auth.views import LoginView
+from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
 from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from urllib.parse import quote_plus
+
+from telebot.apihelper import ApiTelegramException
+
 from .forms import RegistrationForm, LoginUserForm, ChangeUsernameForm
+from .main import bot
 from .models import *
 from django.views.generic import ListView, CreateView, UpdateView, TemplateView
 
@@ -17,13 +23,13 @@ class ItemList(LoginRequiredMixin, ListView):
     model = Product
     template_name = "Items/index.html"
 
-    # def get_queryset(self):
-    #     try:
-    #         return self.model.objects.filter(family=self.request.user.profile.family)
-    #     except Profile.DoesNotExist:
-    #         self.request.user.profile = Profile()
-    #         self.request.user.profile.save()
-    #         return self.model.objects.filter(family=self.request.user.profile.family)
+    def get_queryset(self):
+        try:
+            return self.model.objects.filter(family=self.request.user.profile.family)
+        except Profile.DoesNotExist:
+            self.request.user.profile = Profile()
+            self.request.user.profile.save()
+            return self.model.objects.filter(family=self.request.user.profile.family)
 
     def get_context_data(self, **kwargs):
         context = super(ItemList, self).get_context_data(**kwargs)
@@ -126,3 +132,29 @@ class InviteLink(LoginRequiredMixin, TemplateView):
         except PermissionError:
             return HttpResponse("Your invite link must be corrupted", status=403)
         return HttpResponseRedirect(reverse_lazy("profile"))
+
+
+@login_required()
+def link_telegram(request: WSGIRequest):
+    if not request.GET.get("token"):
+        return HttpResponse(f"Token is required, you can get one at t.me/{bot.user.username}")
+    # try:
+    request.user.profile.connect_telegram_by_token(request.GET.get("token"))
+    try:
+        request.user.profile.save()
+    except IntegrityError:
+        return HttpResponse("Ошибка сохранения. Возможно telegram привязан к другому аккаунту", status=400)
+    return HttpResponse("OK")
+
+
+def start_pooling():
+    bot.remove_webhook()
+    print(f"Pooling {bot.user.username}")
+    bot.polling()
+
+
+def pooling(request):
+    print(type(request))
+    th = Thread(target=start_pooling)
+    th.start()
+    return HttpResponse("OK")
