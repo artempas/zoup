@@ -2,8 +2,10 @@
 Телеграм бот для составления списка покупок
 """
 from itertools import chain
+from urllib.parse import quote_plus
 
 from django.db.models import QuerySet, Q
+from django.urls import reverse_lazy
 from telebot import *
 from telebot.types import Message, CallbackQuery
 from telebot.apihelper import ApiException
@@ -40,14 +42,15 @@ def login_required(func):
                         reply_markup=quick_markup({"Создать семью": {"url": environ.get("DOMAIN") + "/create_family"}}),
                     )  # TODO Create family URL
             except models.Profile.DoesNotExist:
+                # markup = types.InlineKeyboardMarkup()
+                # markup.add(types.InlineKeyboardButton("Авторизация",login_url=types.LoginUrl(environ.get("DOMAIN") + f"/link_telegram", request_write_access=True)))
                 bot.send_message(
                     args[0].chat.id,
                     f"Необходимо авторизоваться",
                     reply_markup=quick_markup(
                         {
                             "Авторизация": {
-                                "url": environ.get("DOMAIN")
-                                + f"/link_telegram?token={models.Profile.create_login_token(args[0].from_user.id, ('@' + args[0].from_user.username if args[0].from_user.username else None) or args[0].from_user.first_name or args[0].from_user.last_name)}"
+                                "login_url": types.LoginUrl("https://"+environ.get("DOMAIN")+ reverse_lazy("link_telegram"), request_write_access=True)
                             }
                         }
                     ),
@@ -359,6 +362,13 @@ def add_product(msg: Message):
 @bot.callback_query_handler(func=lambda x: True)
 def echo(callback: CallbackQuery):
     bot.answer_callback_query(callback.id, callback.data)
+
+@bot.message_handler(commands=['invite'])
+@login_required
+@log
+def command_invite(msg:Message):
+    family = models.User.objects.get(profile__chat_id=msg.from_user.id).profile.family
+    bot.send_message(msg.chat.id, f'Ссылка для приглашения <code>{environ.get("DOMAIN")+reverse_lazy("invite") + "?token="+ quote_plus(family.create_invite_token())}</code>', parse_mode='HTML')
 
 def start_pooling():
     bot.polling()

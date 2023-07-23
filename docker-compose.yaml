@@ -28,7 +28,7 @@ services:
     command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - static_volume:/home/app/web/staticfiles
-      - zoup:/home/app/web
+      - ./zoup:/home/app/web
     expose:
       - 8000
     depends_on:
