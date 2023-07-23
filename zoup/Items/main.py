@@ -23,12 +23,7 @@ bot = TeleBot(environ.get("TELETOKEN"))
 def log(func):
     def wrapper(*args, **kwargs):
         print(f"{func.__module__}.{func.__qualname__} ( {[str(i) for i in args]} )")
-        try:
-            return func(*args, **kwargs)
-        except Exception as exc:
-            print(exc)
-            return None
-
+        return func(*args, **kwargs)
     return wrapper
 
 
@@ -189,14 +184,17 @@ def remove_product(callback: CallbackQuery):
                 break
         if first_noun is None:
             bot.answer_callback_query(callback.id, f"{deleted.name} удален(a) из списка")
-        parsed = morph.parse(first_noun)[0]
-        inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
-        if parsed.tag.gender is None:
+        try:
+            parsed = morph.parse(first_noun)[0]
+            inflect_to = {"plur"} if parsed.tag.number == "plur" else {parsed.tag.gender}
+            if parsed.tag.gender is None:
+                raise Exception
+            else:
+                bot.answer_callback_query(
+                    callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
+                )
+        except Exception:
             bot.answer_callback_query(callback.id, f"{deleted.name} удален(a) из списка")
-        else:
-            bot.answer_callback_query(
-                callback.id, f"{deleted.name} {morph.parse('вычеркнуто')[0].inflect(inflect_to).word} из списка"
-            )
     other_products = family.get_products.filter(category__name="Другое").order_by("name")
     categoried_products = family.get_products.filter(~Q(category__name="Другое")).order_by("category", "name")
     products = list(chain(categoried_products, other_products))
@@ -320,12 +318,15 @@ def clear_confirmed(callback: CallbackQuery):
 def edit_product(msg: Message):
     queryset = models.Profile.objects.get(chat_id=msg.from_user.id).family.get_products
     try:
-        product = queryset.get(msg.message_id)
+        product = queryset.get(message_id=msg.message_id)
+        to_notify_old = product.to_notify
     except models.Product.DoesNotExist:
+        bot.reply_to(msg, "Продукта нет в списке")
         return
-    product.name = msg.text
-    product.category = models.Product.determine_category(msg.text)
+    product = models.Product.from_message(name=msg.text, message_id=msg.message_id, update=product)
     product.save()
+    if to_notify_old != product.to_notify:
+        models.notify_if_needed(models.Product, product, True)
     bot.reply_to(msg, "Изменено")
 
 
@@ -358,3 +359,6 @@ def add_product(msg: Message):
 @bot.callback_query_handler(func=lambda x: True)
 def echo(callback: CallbackQuery):
     bot.answer_callback_query(callback.id, callback.data)
+
+def start_pooling():
+    bot.polling()

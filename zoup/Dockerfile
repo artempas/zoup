@@ -18,10 +18,7 @@ RUN apk update && apk add libpq gcc musl-dev python3-dev
 COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 
-# copy project
-COPY . $APP_HOME
 
-# chown all the files to the app user
 RUN chown -R app:app $APP_HOME
 
 # change to the app user

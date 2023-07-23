@@ -43,11 +43,12 @@ class RegisterUser(CreateView):
     success_url = ""
 
     def form_valid(self, form):
+        self.request:HttpRequest
         user = form.save()
         user.profile = Profile()
         user.profile.save()
         login(self.request, user)
-        return redirect("index")
+        return redirect(self.request.GET.get('next') or "index")
 
 
 class LoginUser(LoginView):
@@ -144,6 +145,7 @@ def link_telegram(request: WSGIRequest):
         request.user.profile.save()
     except IntegrityError:
         return HttpResponse("Ошибка сохранения. Возможно telegram привязан к другому аккаунту", status=400)
+    bot.send_message(request.user.profile.chat_id, f"Telegram привязан к аккаунту {request.user.username}")
     return HttpResponse("OK")
 
 

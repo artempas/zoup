@@ -24,3 +24,7 @@ class ItemsConfig(AppConfig):
             bot.set_webhook(
                 url=environ.get("DOMAIN") + "/api/bot_updates", secret_token=environ.get("WEBHOOK_SECRET_KEY")
             )
+        else:
+            from Items import main
+            th = Thread(target=main.start_pooling)
+            th.start()
