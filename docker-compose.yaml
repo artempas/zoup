@@ -28,17 +28,11 @@ services:
     command: gunicorn zoup.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - static_volume:/home/app/web/staticfiles
+      - zoup:/home/app/web
     expose:
       - 8000
     depends_on:
       - db
-  split-bot:
-    build: ../split-bill-bot
-    command: gunicorn --bind 0.0.0.0:5000 flask_app:app --access-logfile gunicorn_access.log --error-logfile gunicorn_error.log
-    volumes:
-      - ../split-bill-bot/:/usr/src/app/
-    expose:
-      - 5000
   nginx:
     image: nginx:latest
     volumes:
@@ -53,7 +47,6 @@ services:
     depends_on:
       - web
       - pgadmin
-      - split-bot
   certbot:
     image: certbot/certbot:latest
     volumes:
@@ -63,3 +56,4 @@ services:
 volumes:
   static_volume:
   postgres_data:
+  zoup:

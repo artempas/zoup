@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from Items import api
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -93,8 +92,12 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_NAME"),
         "USER": os.environ.get("POSTGRES_USER"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
-        "HOST": "db" if not os.environ.get("TEST_ENV") else "localhost",
+        "HOST": "db",
         "PORT": "5432",
+    } if not os.environ.get('TEST_ENV') else
+    {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'dev_database',
     }
 }
 

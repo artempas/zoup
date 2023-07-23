@@ -80,7 +80,6 @@ class Profile(models.Model):
 
     @telegram_link.setter
     def telegram_link(self, value):
-        bot.send_message(value, f"Telegram привязан к аккаунту {self.user.username}")
         self.chat_id = value
 
     @staticmethod
@@ -114,13 +113,16 @@ class Profile(models.Model):
     def family(self, value: Family):
         if self.__old_family is None:
             self.__old_family = self._family
-        self._family = value
-        notify(
-            f"{self.user.username} присоединяется к семье",
-            [i.chat_id for i in self.family.members.all() if i.chat_id and i.chat_id != self.chat_id],
-        )
-        if self.chat_id:
-            bot.send_message(self.chat_id, f"Теперь вы в семье {self.family.name}")
+        if value:
+            self._family = value
+            notify(
+                f"{self.user.username} присоединяется к семье",
+                [i.chat_id for i in self.family.members.all() if i.chat_id and i.chat_id != self.chat_id],
+            )
+            if self.chat_id:
+                bot.send_message(self.chat_id, f"Теперь вы в семье {self.family.name}")
+        else:
+            self._family = None
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -170,18 +172,25 @@ class Product(models.Model):
     message_id = models.IntegerField(blank=True, null=True)
 
     @classmethod
-    def from_message(cls, name: str, created_by: User, message_id: int):
+    def from_message(cls, name: str, message_id: int, created_by: User = None, update=None):
         to_notify = "срочно" in name.lower()
         if to_notify:
             name = re.compile("срочно", re.IGNORECASE | re.UNICODE).sub("", name)
-        return cls(
-            name=name,
-            category=cls.determine_category(name),
-            created_by=created_by,
-            family=created_by.profile.family,
-            to_notify=to_notify,
-            message_id=message_id,
-        )
+        if update:
+            print(type(cls.determine_category(name)) == Category)
+            update.name = name
+            update.category = cls.determine_category(name)
+            update.to_notify = to_notify
+            return update
+        else:
+            return cls(
+                name=name,
+                category=cls.determine_category(name),
+                created_by=created_by,
+                family=created_by.profile.family,
+                to_notify=to_notify,
+                message_id=message_id,
+            )
 
     def __str__(self):
         return f"{self.name}"
