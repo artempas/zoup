@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from django.core.handlers.wsgi import WSGIRequest
-from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
+from django.http import HttpResponseRedirect, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from urllib.parse import quote_plus
@@ -137,10 +137,11 @@ class InviteLink(LoginRequiredMixin, TemplateView):
 
 @login_required()
 def link_telegram(request: WSGIRequest):
-    if not request.GET.get("token"):
-        return HttpResponse(f"Token is required, you can get one at t.me/{bot.user.username}")
+    if not request.GET.get("id"):
+        return HttpResponseBadRequest("id is required")
     # try:
-    request.user.profile.connect_telegram_by_token(request.GET.get("token"))
+    request.user.profile.username = request.GET.get('username')
+    request.user.profile.chat_id = request.GET.get('id')
     try:
         request.user.profile.save()
     except IntegrityError:

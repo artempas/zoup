@@ -96,15 +96,6 @@ class Profile(models.Model):
             key=environ["settings_token"],
         )
 
-    def connect_telegram_by_token(self, token) -> None | int:
-        try:
-            params = decode(token, environ["settings_token"], algorithms="HS256")
-        except InvalidTokenError:
-            raise PermissionError("Token is invalid")
-        self.telegram_link = params.get("chat_id")
-        self.telegram_name = params.get("username")
-        return self.telegram_link
-
     @property
     def family(self):
         return self._family
