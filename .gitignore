@@ -56,3 +56,4 @@ docs/_build/
 /zoup/.env
 /tests.py
 /zoup/zoup/.env
+.env
