@@ -20,6 +20,7 @@ urlpatterns = [
     path("invite/", views.InviteLink.as_view(), name="invite"),
     path("api/", include("Items.api.urls")),
     path("link_telegram/", views.link_telegram, name='link_telegram'),
+    path("tg_auth/", views.tg_auth)
 ]
 load_dotenv()
 if environ.get("TEST_ENV"):

@@ -1,4 +1,8 @@
+import hashlib
+import hmac
 from threading import Thread
+
+from django.core.exceptions import PermissionDenied
 from django.db.utils import IntegrityError
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -161,3 +165,41 @@ def pooling(request):
     th = Thread(target=start_pooling)
     th.start()
     return HttpResponse("OK")
+
+
+def tg_auth(request:WSGIRequest):
+    if not all(request.GET.get(i) for i in ["id", "first_name", "last_name", "photo_url", "auth_date", "hash"]):
+        return HttpResponseBadRequest("Some parameters are missing")
+    params_list=[]
+    for key,val in request.GET.items():
+        if key!='hash':
+            params_list.append(f"{key}={val}")
+    params_list.sort()
+    user_hash = hmac.new(bytes('\n'.join(params_list), 'UTF-8'), "12345".encode(), hashlib.sha256).hexdigest()
+    if user_hash!=request.GET.get('hash'):
+        raise PermissionDenied()
+
+    try:
+        user = Profile.objects.get(chat_id=int(request.GET.get("id"))).user
+        login(request, user)
+    except Profile.DoesNotExist:
+        if request.user:
+            try:
+                request.user.profile.chat_id=request.GET.get('id')
+                request.user.profile.telegram_name='@' + request.GET.get("username") if request.GET.get("username") else None
+                request.user.profile.save()
+            except IntegrityError:
+                username = User.objects.get(profile__chat_id=request.GET.get('id')).username
+                return HttpResponseBadRequest(f"This telegram account is already connected to user {username}")
+        else:
+            user = User.objects.create(
+                username=request.GET.get('username') or request.GET.get('first_name')+request.GET.get('last_name')
+            )
+            user.save()
+            profile = Profile.objects.create(
+                user=user,
+                chat_id=request.GET.get("id"),
+                telegram_name='@'+request.GET.get("username") if request.GET.get("username") else None,
+            )
+            profile.save()
+
