@@ -50,7 +50,7 @@ def login_required(func):
                     reply_markup=quick_markup(
                         {
                             "Авторизация": {
-                                "login_url": types.LoginUrl("https://"+environ.get("DOMAIN")+ reverse_lazy("link_telegram"), request_write_access=True)
+                                "login_url": types.LoginUrl(environ.get("DOMAIN")+ reverse_lazy("link_telegram"), request_write_access=True)
                             }
                         }
                     ),
